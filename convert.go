@@ -27,8 +27,6 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 		columns[i] = strings.ToLower(v)
 	}
 
-	fmt.Println("columns:", columns)
-
 	var elemTyp = dstTyp.Elem()
 	var fieldIdxMap map[string]int
 	var stored, ok = mapping.Load(key)
@@ -40,8 +38,6 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 		for _, fieldName := range columns {
 			existsMap[fieldName] = true
 		}
-		// fmt.Println("existsMap:", existsMap)
-		// for _, fieldName := range columns {
 		for j := 0; j < elemTyp.NumField(); j++ {
 			strField := elemTyp.Field(j)
 			fieldName := strings.ToLower(parser(&strField))
@@ -50,9 +46,6 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 				// break
 			}
 		}
-		// fmt.Println("fieldIdxMap:", fieldIdxMap)
-		// }
-
 		mapping.Store(key, fieldIdxMap)
 	}
 	if rows.Next() {
@@ -90,8 +83,6 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.Str
 		columns[i] = strings.ToLower(v)
 	}
 
-	fmt.Println("columns:", columns)
-
 	elemTyp := dstTyp.Elem().Elem()
 	isPtrType := elemTyp.Kind() == reflect.Ptr
 	if isPtrType {
@@ -107,8 +98,6 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.Str
 		for _, fieldName := range columns {
 			existsMap[fieldName] = true
 		}
-		// fmt.Println("existsMap:", existsMap)
-		// for _, fieldName := range columns {
 		for j := 0; j < elemTyp.NumField(); j++ {
 			strField := elemTyp.Field(j)
 			fieldName := strings.ToLower(parser(&strField))
@@ -116,9 +105,6 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.Str
 				fieldIdxMap[fieldName] = j
 			}
 		}
-		// fmt.Println("fieldIdxMap:", fieldIdxMap)
-		// }
-
 		mapping.Store(key, fieldIdxMap)
 	}
 
