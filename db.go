@@ -70,15 +70,23 @@ func (db *DB) Query(dst interface{}, query string, args ...interface{}) error {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
+func (db *DB) InsertContext(ctx context.Context, table string, data interface{}) (sql.Result, error) {
+	return insertContext(ctx, db.DB, table, data, db.parseFieldName, db.mapping)
+}
+
+func (db *DB) Insert(table string, data interface{}) (sql.Result, error) {
+	return db.InsertContext(context.Background(), table, data)
+}
+
+func (db *DB) SetFieldParser(f func(field *reflect.StructField) string) {
+	db.fieldNameParser = f
+}
+
 func (db *DB) parseFieldName(field *reflect.StructField) string {
 	if db.fieldNameParser != nil {
 		return db.fieldNameParser(field)
 	}
 	return field.Tag.Get(db.tag)
-}
-
-func (db *DB) SetFieldParser(f func(field *reflect.StructField) string) {
-	db.fieldNameParser = f
 }
 
 func Open(driverName, dataSourceName string, tag string) (*DB, error) {

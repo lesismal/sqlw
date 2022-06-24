@@ -1,6 +1,7 @@
 package sqlw
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"reflect"
@@ -15,7 +16,7 @@ func sqlKey(query string, dst interface{}) string {
 func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map, key string) error {
 	dstTyp := reflect.TypeOf(dst)
 	if !isStructPtr(dstTyp) {
-		return fmt.Errorf("invalid dest type: %v", dstTyp)
+		return fmt.Errorf("[sqlw query] invalid dest type: %v", dstTyp)
 	}
 
 	columns, err := rows.Columns()
@@ -43,7 +44,6 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 			fieldName := strings.ToLower(parser(&strField))
 			if existsMap[fieldName] {
 				fieldIdxMap[fieldName] = j
-				// break
 			}
 		}
 		mapping.Store(key, fieldIdxMap)
@@ -71,7 +71,7 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map, key string) error {
 	dstTyp := reflect.TypeOf(dst)
 	if !isStructSlicePtr(dstTyp) {
-		return fmt.Errorf("invalid dest type: %v", dstTyp)
+		return fmt.Errorf("[sqlw query] invalid dest type: %v", dstTyp)
 	}
 
 	columns, err := rows.Columns()
@@ -136,6 +136,156 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.Str
 	return nil
 }
 
+func insertContext(ctx context.Context, selector Selector, sqlHead string, data interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map) (sql.Result, error) {
+	if sqlHead == "" {
+		return nil, fmt.Errorf("[sqlw insert] invalid sql: %v", sqlHead)
+	}
+	if strings.Index(sqlHead, "values") >= 0 {
+		return nil, fmt.Errorf("[sqlw insert] invalid sql, should not contains \"values\": %v", sqlHead)
+	}
+	sqlHead = strings.ToLower(sqlHead)
+
+	dataTyp := reflect.TypeOf(data)
+	if !isInsertable(dataTyp) {
+		return nil, fmt.Errorf("[sqlw insert] invalid dest type: %v", dataTyp)
+	}
+
+	type InsertInfo struct {
+		SqlStr       string
+		FieldNames   []string
+		FieldIndexes map[string]int
+	}
+
+	var info *InsertInfo
+	var fieldNames []string
+	var fieldNamesMap map[string]struct{}
+	var fieldValues []interface{}
+	var insertItems []reflect.Value
+	var sqlTail = " values"
+	var key = sqlKey(sqlHead+"insert", data)
+	var stored, ok = mapping.Load(key)
+	if ok {
+		info = stored.(*InsertInfo)
+	} else {
+		info = &InsertInfo{
+			SqlStr:       "",
+			FieldIndexes: map[string]int{},
+		}
+		if posBegin := strings.Index(sqlHead, "("); posBegin > 1 { // table name and space, at least 2 characters
+			fieldNamesMap = map[string]struct{}{}
+			posEnd := strings.Index(sqlHead, ")")
+			if posEnd < 0 || posEnd < posBegin {
+				return nil, fmt.Errorf("[sqlw insert] invalid sql: %v", sqlHead)
+			}
+			fieldsStr := sqlHead[posBegin+1 : posEnd]
+			fieldNames = strings.Split(fieldsStr, ",")
+			if len(fieldNames) == 0 {
+				return nil, fmt.Errorf("[sqlw insert] invalid sql: %v", sqlHead)
+			}
+			for i, v := range fieldNames {
+				s := strings.ToLower(strings.TrimSpace(v))
+				fieldNames[i] = s
+				fieldNamesMap[s] = struct{}{}
+			}
+
+		}
+		initFiedNames := func(typ reflect.Type) {
+			if len(fieldNames) == 0 {
+				for i := 0; i < typ.NumField(); i++ {
+					strField := typ.Field(i)
+					fieldName := strings.ToLower(parser(&strField))
+					if fieldName != "" {
+						fieldNames = append(fieldNames, fieldName)
+						info.FieldIndexes[fieldName] = i
+					}
+				}
+				sqlHead += "("
+				for i, fieldName := range fieldNames {
+					sqlHead += fieldName
+					if i != len(fieldNames)-1 {
+						sqlHead += ","
+					}
+				}
+				sqlHead += ")"
+			} else {
+				for i := 0; i < typ.NumField(); i++ {
+					strField := typ.Field(i)
+					fieldName := strings.ToLower(parser(&strField))
+					if _, ok := fieldNamesMap[fieldName]; ok {
+						info.FieldIndexes[fieldName] = i
+					}
+				}
+			}
+
+			info.SqlStr = sqlHead
+			info.FieldNames = fieldNames
+			mapping.Store(key, info)
+		}
+		typ := dataTyp
+	INIT_FIELD_NAMES:
+		switch typ.Kind() {
+		case reflect.Struct:
+			initFiedNames(typ)
+		case reflect.Ptr:
+			typ = typ.Elem()
+			goto INIT_FIELD_NAMES
+		case reflect.Slice:
+			typ = typ.Elem()
+			if typ.Kind() == reflect.Ptr {
+				typ = typ.Elem()
+			}
+			initFiedNames(typ)
+		default:
+		}
+	}
+
+	dataVal := reflect.ValueOf(data)
+
+INIT_FIELD_VALUES:
+	switch dataTyp.Kind() {
+	case reflect.Struct:
+		insertItems = append(insertItems, dataVal)
+	case reflect.Ptr:
+		dataTyp = dataTyp.Elem()
+		goto INIT_FIELD_VALUES
+	case reflect.Slice:
+		isPtrElem := false
+		dataTyp = dataTyp.Elem()
+		if dataTyp.Kind() == reflect.Ptr {
+			isPtrElem = true
+		}
+
+		for i := 0; i < dataVal.Len(); i++ {
+			val := dataVal.Index(i)
+			if isPtrElem {
+				val = val.Elem()
+			}
+			insertItems = append(insertItems, dataVal)
+		}
+	default:
+	}
+
+	for _, item := range insertItems {
+		sqlTail += "("
+		for i, fieldName := range info.FieldNames {
+			if idx, ok := info.FieldIndexes[fieldName]; ok {
+				fieldValues = append(fieldValues, item.Field(idx).Interface())
+				sqlTail += "?"
+				if i != len(info.FieldNames)-1 {
+					sqlTail += ","
+				}
+			}
+		}
+		sqlTail += ")"
+	}
+
+	if !strings.Contains(sqlHead, "insert") {
+		sqlHead = "insert into " + sqlHead
+	}
+
+	return selector.ExecContext(ctx, sqlHead+sqlTail, fieldValues...)
+}
+
 func isStructPtr(t reflect.Type) bool {
 	return t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct
 }
@@ -149,4 +299,20 @@ func isStructSlicePtr(t reflect.Type) bool {
 		}
 	}
 	return false
+}
+
+func isInsertable(t reflect.Type) bool {
+	kind := t.Kind()
+	if kind == reflect.Struct || (kind == reflect.Ptr && t.Elem().Kind() == reflect.Struct) {
+		return true
+	}
+
+	if kind == reflect.Slice {
+		kind := t.Elem().Kind()
+		if kind == reflect.Struct || (kind == reflect.Ptr && t.Elem().Elem().Kind() == reflect.Struct) {
+			return true
+		}
+	}
+
+	return isStructSlicePtr(t)
 }

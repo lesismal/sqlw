@@ -11,6 +11,7 @@ import (
 type Selector interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
 func queryRowContext(ctx context.Context, selector Selector, parser func(field *reflect.StructField) string, dst interface{}, mapping *sync.Map, query string, args ...interface{}) error {
