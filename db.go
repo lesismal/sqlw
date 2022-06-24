@@ -20,9 +20,8 @@ func (db *DB) Begin() (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{
-		Tx:      tx,
-		parser:  db.parseFieldName,
-		mapping: db.mapping,
+		DB: db,
+		Tx: tx,
 	}, nil
 }
 
@@ -32,9 +31,8 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{
-		Tx:      tx,
-		parser:  db.parseFieldName,
-		mapping: db.mapping,
+		DB: db,
+		Tx: tx,
 	}, nil
 }
 
@@ -48,9 +46,8 @@ func (db *DB) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 		return nil, err
 	}
 	return &Stmt{
-		Stmt:    stmt,
-		parser:  db.parseFieldName,
-		mapping: db.mapping,
+		DB:   db,
+		Stmt: stmt,
 	}, nil
 }
 
@@ -70,16 +67,24 @@ func (db *DB) Query(dst interface{}, query string, args ...interface{}) error {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (db *DB) InsertContext(ctx context.Context, table string, data interface{}) (sql.Result, error) {
-	return insertContext(ctx, db.DB, table, data, db.parseFieldName, db.mapping)
+func (db *DB) InsertContext(ctx context.Context, sqlHead string, data interface{}) (sql.Result, error) {
+	return insertContext(ctx, db.DB, nil, sqlHead, nil, data, db.parseFieldName, db.mapping)
 }
 
-func (db *DB) Insert(table string, data interface{}) (sql.Result, error) {
-	return db.InsertContext(context.Background(), table, data)
+func (db *DB) Insert(sqlHead string, data interface{}) (sql.Result, error) {
+	return db.InsertContext(context.Background(), sqlHead, data)
 }
 
 func (db *DB) SetFieldParser(f func(field *reflect.StructField) string) {
 	db.fieldNameParser = f
+}
+
+func (db *DB) Tag() string {
+	return db.tag
+}
+
+func (db *DB) Mapping() *sync.Map {
+	return db.mapping
 }
 
 func (db *DB) parseFieldName(field *reflect.StructField) string {

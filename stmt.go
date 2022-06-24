@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
-	"sync"
 )
 
 type Stmt struct {
+	*DB
 	*sql.Stmt
-	mapping *sync.Map
-	query   string
-	parser  func(field *reflect.StructField) string
+	query string
 }
 
 func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...interface{}) error {
@@ -26,7 +24,7 @@ func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...
 	}
 	defer rows.Close()
 
-	return rowsToStruct(rows, dst, stmt.parser, stmt.mapping, sqlKey(stmt.query, dst))
+	return rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey("select", stmt.query, reflect.TypeOf(dst)))
 }
 
 func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) error {
@@ -40,9 +38,17 @@ func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...int
 	}
 	defer rows.Close()
 
-	return rowsToSlice(rows, dst, stmt.parser, stmt.mapping, sqlKey(stmt.query, dst))
+	return rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey("select", stmt.query, reflect.TypeOf(dst)))
 }
 
 func (stmt *Stmt) Query(dst interface{}, args ...interface{}) error {
 	return stmt.QueryContext(context.Background(), dst, args...)
+}
+
+func (stmt *Stmt) InsertContext(ctx context.Context, data ...interface{}) (sql.Result, error) {
+	return insertContext(ctx, nil, stmt, stmt.query, nil, data, stmt.parseFieldName, stmt.mapping)
+}
+
+func (stmt *Stmt) Insert(data ...interface{}) (sql.Result, error) {
+	return stmt.InsertContext(context.Background(), data...)
 }

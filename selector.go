@@ -25,7 +25,7 @@ func queryRowContext(ctx context.Context, selector Selector, parser func(field *
 	}
 	defer rows.Close()
 
-	return rowsToStruct(rows, dst, parser, mapping, sqlKey(query, dst))
+	return rowsToStruct(rows, dst, parser, mapping, sqlMappingKey("select", query, reflect.TypeOf(dst)))
 }
 
 func queryContext(ctx context.Context, selector Selector, parser func(field *reflect.StructField) string, dst interface{}, mapping *sync.Map, query string, args ...interface{}) error {
@@ -35,5 +35,5 @@ func queryContext(ctx context.Context, selector Selector, parser func(field *ref
 	}
 	defer rows.Close()
 
-	return rowsToSlice(rows, dst, parser, mapping, sqlKey(query, dst))
+	return rowsToSlice(rows, dst, parser, mapping, sqlMappingKey("select", query, reflect.TypeOf(dst)))
 }
