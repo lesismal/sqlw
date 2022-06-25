@@ -73,12 +73,12 @@ func (stmt *Stmt) Select(dst interface{}, query string, args ...interface{}) (Re
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 
-func (stmt *Stmt) InsertContext(ctx context.Context, data ...interface{}) (Result, error) {
-	return insertContext(ctx, nil, stmt, stmt.query, data, stmt.parseFieldName, stmt.mapping)
+func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Result, error) {
+	return insertContext(ctx, nil, stmt, stmt.query, stmt.parseFieldName, stmt.mapping, args...)
 }
 
-func (stmt *Stmt) Insert(data ...interface{}) (Result, error) {
-	return stmt.InsertContext(context.Background(), data...)
+func (stmt *Stmt) Insert(args ...interface{}) (Result, error) {
+	return stmt.InsertContext(context.Background(), args...)
 }
 
 func (stmt *Stmt) UpdateContext(ctx context.Context, args ...interface{}) (Result, error) {

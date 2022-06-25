@@ -73,12 +73,12 @@ func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (db *DB) InsertContext(ctx context.Context, sqlHead string, data interface{}) (Result, error) {
-	return insertContext(ctx, db.DB, nil, sqlHead, data, db.parseFieldName, db.mapping)
+func (db *DB) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
+	return insertContext(ctx, db.DB, nil, sqlHead, db.parseFieldName, db.mapping, args...)
 }
 
-func (db *DB) Insert(sqlHead string, data interface{}) (Result, error) {
-	return db.InsertContext(context.Background(), sqlHead, data)
+func (db *DB) Insert(sqlHead string, args ...interface{}) (Result, error) {
+	return db.InsertContext(context.Background(), sqlHead, args...)
 }
 
 func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {

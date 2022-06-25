@@ -180,7 +180,31 @@ type InsertInfo struct {
 	FieldIndexes map[string]int
 }
 
+func parseInsertFields(sqlHead string) ([]string, map[string]struct{}, error) {
+	var fieldNames []string
+	var fieldNamesMap map[string]struct{}
+	if posBegin := strings.Index(sqlHead, "("); posBegin > 1 { // table name and space, at least 2 characters
+		fieldNamesMap = map[string]struct{}{}
+		posEnd := strings.Index(sqlHead, ")")
+		if posEnd < 0 || posEnd < posBegin {
+			return nil, nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
+		}
+		fieldsStr := sqlHead[posBegin+1 : posEnd]
+		fieldNames = strings.Split(fieldsStr, ",")
+		if len(fieldNames) == 0 {
+			return nil, nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
+		}
+		for i, v := range fieldNames {
+			s := strings.TrimSpace(v)
+			fieldNames[i] = s
+			fieldNamesMap[s] = struct{}{}
+		}
+	}
+	return fieldNames, fieldNamesMap, nil
+}
+
 func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*InsertInfo, error) {
+	var err error
 	var info *InsertInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
@@ -192,23 +216,9 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 		info = &InsertInfo{
 			FieldIndexes: map[string]int{},
 		}
-		if posBegin := strings.Index(sqlHead, "("); posBegin > 1 { // table name and space, at least 2 characters
-			fieldNamesMap = map[string]struct{}{}
-			posEnd := strings.Index(sqlHead, ")")
-			if posEnd < 0 || posEnd < posBegin {
-				return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
-			}
-			fieldsStr := sqlHead[posBegin+1 : posEnd]
-			fieldNames = strings.Split(fieldsStr, ",")
-			if len(fieldNames) == 0 {
-				return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
-			}
-			for i, v := range fieldNames {
-				s := strings.TrimSpace(v)
-				fieldNames[i] = s
-				fieldNamesMap[s] = struct{}{}
-			}
-
+		fieldNames, fieldNamesMap, err = parseInsertFields(sqlHead)
+		if err != nil {
+			return nil, err
 		}
 		initFiedNames := func(typ reflect.Type) {
 			if len(fieldNames) == 0 {
@@ -268,7 +278,7 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	return info, nil
 }
 
-func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, data interface{}, parser FieldParser, mapping *sync.Map) (Result, error) {
+func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, parser FieldParser, mapping *sync.Map, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
@@ -281,9 +291,52 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
 	}
 
-	dataTyp := reflect.TypeOf(data)
-	if !isInsertable(dataTyp) {
-		return nil, fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypInsert, dataTyp)
+	var raw = false
+	var data interface{}
+	var dataTyp reflect.Type
+	if len(args) == 1 {
+		data = args[0]
+		dataTyp = reflect.TypeOf(data)
+		if !isInsertable(dataTyp) {
+			raw = true
+		}
+	} else {
+		raw = true
+	}
+
+	if raw {
+		if !isStmt {
+			var sqlTail string
+			if !strings.Contains(sqlHead, "values") {
+				sqlTail = " values"
+			}
+			if len(args) > 0 {
+				fieldNames, _, err := parseInsertFields(sqlHead)
+				if err != nil {
+					return nil, err
+				}
+				for i := 0; i < len(args); {
+					sqlTail += "("
+					for j := 0; j < len(fieldNames); j++ {
+						sqlTail += "?"
+						if j != len(fieldNames)-1 {
+							sqlTail += ","
+						}
+						i++
+					}
+					if i != len(args) {
+						sqlTail += "),"
+					} else {
+						sqlTail += ")"
+					}
+				}
+			}
+			result, err := selector.ExecContext(ctx, sqlHead+sqlTail, args...)
+			return newResult(result, sqlHead, args), err
+		}
+
+		result, err := stmt.ExecContext(ctx, args...)
+		return newResult(result, stmt.query, args), err
 	}
 
 	var err error
