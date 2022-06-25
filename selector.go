@@ -36,6 +36,10 @@ func queryContext(ctx context.Context, selector Selector, parser func(field *ref
 	}
 	defer rows.Close()
 
+	if isStructPtr(reflect.TypeOf(dst)) {
+		return rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	}
+
 	return rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 }
 

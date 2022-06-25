@@ -65,6 +65,14 @@ func (db *DB) Query(dst interface{}, query string, args ...interface{}) error {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
+func (db *DB) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+	return db.QueryContext(ctx, dst, query, args...)
+}
+
+func (db *DB) Select(dst interface{}, query string, args ...interface{}) error {
+	return db.QueryContext(context.Background(), dst, query, args...)
+}
+
 func (db *DB) InsertContext(ctx context.Context, sqlHead string, data interface{}) (Result, error) {
 	return insertContext(ctx, db.DB, nil, sqlHead, data, db.parseFieldName, db.mapping)
 }

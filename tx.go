@@ -26,6 +26,14 @@ func (tx *Tx) Query(dst interface{}, query string, args ...interface{}) error {
 	return tx.QueryContext(context.Background(), dst, query, args...)
 }
 
+func (tx *Tx) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+	return tx.QueryContext(ctx, dst, query, args...)
+}
+
+func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) error {
+	return tx.QueryContext(context.Background(), dst, query, args...)
+}
+
 func (tx *Tx) InsertContext(ctx context.Context, sqlHead string, data interface{}) (Result, error) {
 	return insertContext(ctx, tx.Tx, nil, sqlHead, data, tx.parseFieldName, tx.mapping)
 }

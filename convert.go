@@ -15,9 +15,9 @@ func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
 
 func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map, key string, rawScan bool) error {
 	dstTyp := reflect.TypeOf(dst)
-	if !isStructPtr(dstTyp) {
-		return fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, dstTyp)
-	}
+	// if !isStructPtr(dstTyp) {
+	// 	return fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, dstTyp)
+	// }
 
 	columns, err := rows.Columns()
 	if err != nil {

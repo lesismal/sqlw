@@ -42,10 +42,22 @@ func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...int
 	}
 	defer rows.Close()
 
+	if isStructPtr(reflect.TypeOf(dst)) {
+		return rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+	}
+
 	return rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
 }
 
 func (stmt *Stmt) Query(dst interface{}, args ...interface{}) error {
+	return stmt.QueryContext(context.Background(), dst, args...)
+}
+
+func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+	return stmt.QueryContext(ctx, dst, args...)
+}
+
+func (stmt *Stmt) Select(dst interface{}, query string, args ...interface{}) error {
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 
