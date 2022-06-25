@@ -10,6 +10,7 @@ import (
 type DB struct {
 	*sql.DB
 	tag             string
+	rawScan         bool
 	mapping         *sync.Map
 	fieldNameParser func(field *reflect.StructField) string
 }
@@ -45,14 +46,11 @@ func (db *DB) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{
-		DB:   db,
-		Stmt: stmt,
-	}, nil
+	return NewStmt(db, stmt, query), nil
 }
 
 func (db *DB) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
-	return queryRowContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, query, args...)
+	return queryRowContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
 func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) error {
@@ -60,19 +58,27 @@ func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) error
 }
 
 func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
-	return queryContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, query, args...)
+	return queryContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
 func (db *DB) Query(dst interface{}, query string, args ...interface{}) error {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (db *DB) InsertContext(ctx context.Context, sqlHead string, data interface{}) (sql.Result, error) {
-	return insertContext(ctx, db.DB, nil, sqlHead, nil, data, db.parseFieldName, db.mapping)
+func (db *DB) InsertContext(ctx context.Context, sqlHead string, data interface{}) (Result, error) {
+	return insertContext(ctx, db.DB, nil, sqlHead, data, db.parseFieldName, db.mapping)
 }
 
-func (db *DB) Insert(sqlHead string, data interface{}) (sql.Result, error) {
+func (db *DB) Insert(sqlHead string, data interface{}) (Result, error) {
 	return db.InsertContext(context.Background(), sqlHead, data)
+}
+
+func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
+	return updateByExecContext(ctx, db.DB, nil, db.parseFieldName, db.mapping, sqlHead, args...)
+}
+
+func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
+	return db.UpdateContext(context.Background(), sqlHead, args...)
 }
 
 func (db *DB) SetFieldParser(f func(field *reflect.StructField) string) {
@@ -85,6 +91,14 @@ func (db *DB) Tag() string {
 
 func (db *DB) Mapping() *sync.Map {
 	return db.mapping
+}
+
+func (db *DB) RawScan() bool {
+	return db.rawScan
+}
+
+func (db *DB) SetRawScan(rawScan bool) {
+	db.rawScan = rawScan
 }
 
 func (db *DB) parseFieldName(field *reflect.StructField) string {
@@ -105,6 +119,7 @@ func Open(driverName, dataSourceName string, tag string) (*DB, error) {
 	return &DB{
 		DB:      db,
 		tag:     tag,
+		rawScan: true,
 		mapping: &sync.Map{},
 	}, err
 }
@@ -116,6 +131,7 @@ func Wrap(db *sql.DB, tag string) *DB {
 	return &DB{
 		DB:      db,
 		tag:     tag,
+		rawScan: true,
 		mapping: &sync.Map{},
 	}
 }
