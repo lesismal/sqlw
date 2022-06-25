@@ -7,12 +7,56 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 type FieldParser func(field *reflect.StructField) string
 
+type MappingInfo struct {
+	SqlHead      string
+	FieldNames   []string
+	FieldIndexes map[string]int
+}
+
+type Selector interface {
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+}
+
 func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
 	return fmt.Sprintf("%v/%v/%v", opTyp, query, typ.String())
+}
+
+func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
+	if dst == nil {
+		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
+	}
+
+	rows, err := selector.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	return newResult(nil, query, args), err
+}
+
+func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
+	rows, err := selector.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if isStructPtr(reflect.TypeOf(dst)) {
+		err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+		return newResult(nil, query, args), err
+	}
+
+	err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	return newResult(nil, query, args), err
 }
 
 func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *sync.Map, key string, rawScan bool) error {
@@ -78,6 +122,8 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *
 				}
 			}
 		}
+	} else {
+		return ErrNotFound
 	}
 
 	return nil
@@ -135,7 +181,10 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 	if dstValue.Len() > 0 {
 		dstValue.Set(dstValue.Slice(0, 0))
 	}
+
+	notFound := true
 	for rows.Next() {
+		notFound = false
 		dstElemVal := reflect.Indirect(reflect.New(elemTyp))
 		if rawScan {
 			for i, fieldName := range columns {
@@ -157,8 +206,6 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 					field, ok := row[i].(*Field)
 					if ok {
 						field.ToValue(dstElemVal.Field(fieldIdx))
-					} else {
-
 					}
 				}
 			}
@@ -171,13 +218,11 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 		}
 	}
 
-	return nil
-}
+	if notFound {
+		return ErrNotFound
+	}
 
-type InsertInfo struct {
-	SqlHead      string
-	FieldNames   []string
-	FieldIndexes map[string]int
+	return nil
 }
 
 func parseInsertFields(sqlHead string) ([]string, map[string]struct{}, error) {
@@ -203,17 +248,17 @@ func parseInsertFields(sqlHead string) ([]string, map[string]struct{}, error) {
 	return fieldNames, fieldNamesMap, nil
 }
 
-func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*InsertInfo, error) {
+func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*MappingInfo, error) {
 	var err error
-	var info *InsertInfo
+	var info *MappingInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = mapping.Load(key)
 	if ok {
-		info = stored.(*InsertInfo)
+		info = stored.(*MappingInfo)
 	} else {
-		info = &InsertInfo{
+		info = &MappingInfo{
 			FieldIndexes: map[string]int{},
 		}
 		fieldNames, fieldNamesMap, err = parseInsertFields(sqlHead)
@@ -285,11 +330,11 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 	}
 
 	sqlHead = strings.ToLower(sqlHead)
-	if strings.Contains(sqlHead, opTypSelect) ||
-		strings.Contains(sqlHead, opTypUpdate) ||
-		strings.Contains(sqlHead, opTypDelete) {
-		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
-	}
+	// if strings.Contains(sqlHead, opTypSelect) ||
+	// 	strings.Contains(sqlHead, opTypUpdate) ||
+	// 	strings.Contains(sqlHead, opTypDelete) {
+	// 	return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
+	// }
 
 	var raw = false
 	var data interface{}
@@ -416,16 +461,16 @@ INIT_FIELD_VALUES:
 	return newResult(result, stmt.query, fieldValues), err
 }
 
-func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*InsertInfo, error) {
-	var info *InsertInfo
+func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*MappingInfo, error) {
+	var info *MappingInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = mapping.Load(key)
 	if ok {
-		info = stored.(*InsertInfo)
+		info = stored.(*MappingInfo)
 	} else {
-		info = &InsertInfo{
+		info = &MappingInfo{
 			FieldIndexes: map[string]int{},
 		}
 		if posBegin := strings.Index(sqlHead, "set"); posBegin > 1 { // table name and space, at least 2 characters
@@ -511,11 +556,11 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser Fi
 	}
 
 	sqlHead = strings.ToLower(sqlHead)
-	if strings.Contains(sqlHead, opTypSelect) ||
-		strings.Contains(sqlHead, opTypInsert) ||
-		strings.Contains(sqlHead, opTypDelete) {
-		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypUpdate, sqlHead)
-	}
+	// if strings.Contains(sqlHead, opTypSelect) ||
+	// 	strings.Contains(sqlHead, opTypInsert) ||
+	// 	strings.Contains(sqlHead, opTypDelete) {
+	// 	return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypUpdate, sqlHead)
+	// }
 
 	var err error
 	var fieldValues []interface{}
@@ -550,6 +595,36 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser Fi
 
 	result, err := stmt.ExecContext(ctx, fieldValues...)
 	return newResult(result, stmt.query, fieldValues), err
+}
+
+func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, query string, args ...interface{}) (Result, error) {
+	var obj interface{}
+	if len(args) > 0 {
+		typ := reflect.TypeOf(args[0])
+		if isStruct(typ) {
+			if _, ok := args[0].(time.Time); !ok {
+				obj = args[0]
+				args = args[1:]
+			}
+		} else if isStructPtr(typ) {
+			if _, ok := args[0].(*time.Time); !ok {
+				obj = args[0]
+				args = args[1:]
+			}
+		}
+	}
+
+	if obj == nil {
+		if selector != nil {
+			result, err := selector.ExecContext(ctx, query, args...)
+			return newResult(result, query, args), err
+		}
+
+		result, err := stmt.ExecContext(ctx, args...)
+		return newResult(result, query, args), err
+	}
+
+	return updateContext(ctx, selector, stmt, parser, mapping, query, obj, args...)
 }
 
 func isStruct(t reflect.Type) bool {

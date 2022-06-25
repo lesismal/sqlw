@@ -29,10 +29,7 @@ func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...
 	defer rows.Close()
 
 	err = rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-	if err != nil {
-		return nil, err
-	}
-	return newResult(nil, stmt.query, args), nil
+	return newResult(nil, stmt.query, args), err
 }
 
 func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) (Result, error) {
@@ -48,17 +45,11 @@ func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...int
 
 	if isStructPtr(reflect.TypeOf(dst)) {
 		err = rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-		if err != nil {
-			return nil, err
-		}
-		return newResult(nil, stmt.query, args), nil
+		return newResult(nil, stmt.query, args), err
 	}
 
 	err = rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-	if err != nil {
-		return nil, err
-	}
-	return newResult(nil, stmt.query, args), nil
+	return newResult(nil, stmt.query, args), err
 }
 
 func (stmt *Stmt) Query(dst interface{}, args ...interface{}) (Result, error) {
