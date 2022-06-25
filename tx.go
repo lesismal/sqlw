@@ -10,27 +10,27 @@ type Tx struct {
 	*sql.Tx
 }
 
-func (tx *Tx) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return queryRowContext(ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
 }
 
-func (tx *Tx) QueryRow(dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return tx.QueryRowContext(context.Background(), dst, query, args...)
 }
 
-func (tx *Tx) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return queryContext(ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
 }
 
-func (tx *Tx) Query(dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return tx.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (tx *Tx) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return tx.QueryContext(ctx, dst, query, args...)
 }
 
-func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) error {
+func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return tx.QueryContext(context.Background(), dst, query, args...)
 }
 

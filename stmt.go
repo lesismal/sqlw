@@ -17,47 +17,59 @@ func (stmt *Stmt) Sql(ctx context.Context, dst interface{}, args ...interface{})
 	return stmt.query
 }
 
-func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...interface{}) error {
+func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
 	if dst == nil {
-		return fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
+		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
 	}
 
 	rows, err := stmt.Stmt.QueryContext(ctx, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
-	return rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+	err = rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+	if err != nil {
+		return nil, err
+	}
+	return newResult(nil, stmt.query, args), nil
 }
 
-func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) error {
+func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryRowContext(context.Background(), dst, args...)
 }
 
-func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...interface{}) error {
+func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
 	rows, err := stmt.Stmt.QueryContext(ctx, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
 	if isStructPtr(reflect.TypeOf(dst)) {
-		return rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+		err = rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+		if err != nil {
+			return nil, err
+		}
+		return newResult(nil, stmt.query, args), nil
 	}
 
-	return rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+	err = rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
+	if err != nil {
+		return nil, err
+	}
+	return newResult(nil, stmt.query, args), nil
 }
 
-func (stmt *Stmt) Query(dst interface{}, args ...interface{}) error {
+func (stmt *Stmt) Query(dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 
-func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(ctx, dst, args...)
 }
 
-func (stmt *Stmt) Select(dst interface{}, query string, args ...interface{}) error {
+func (stmt *Stmt) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 

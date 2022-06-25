@@ -49,27 +49,27 @@ func (db *DB) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 	return NewStmt(db, stmt, query), nil
 }
 
-func (db *DB) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (db *DB) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return queryRowContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
-func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) error {
+func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return db.QueryRowContext(context.Background(), dst, query, args...)
 }
 
-func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return queryContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
-func (db *DB) Query(dst interface{}, query string, args ...interface{}) error {
+func (db *DB) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (db *DB) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) error {
+func (db *DB) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
 	return db.QueryContext(ctx, dst, query, args...)
 }
 
-func (db *DB) Select(dst interface{}, query string, args ...interface{}) error {
+func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 

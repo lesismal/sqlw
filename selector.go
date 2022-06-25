@@ -15,32 +15,43 @@ type Selector interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
+func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
 	if dst == nil {
-		return fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
+		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
 	}
 
 	rows, err := selector.QueryContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
-	return rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	if err != nil {
+		return nil, err
+	}
+
+	return newResult(nil, query, args), nil
 }
 
-func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
+func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
 	rows, err := selector.QueryContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
 	if isStructPtr(reflect.TypeOf(dst)) {
-		return rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+		err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+		return newResult(nil, query, args), nil
 	}
 
-	return rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	if err != nil {
+		return nil, err
+	}
+
+	return newResult(nil, query, args), nil
 }
 
 func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, query string, args ...interface{}) (Result, error) {
