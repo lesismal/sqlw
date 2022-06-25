@@ -12,7 +12,7 @@ type DB struct {
 	tag             string
 	rawScan         bool
 	mapping         *sync.Map
-	fieldNameParser func(field *reflect.StructField) string
+	fieldNameParser FieldParser
 }
 
 func (db *DB) Begin() (*Tx, error) {
@@ -89,7 +89,7 @@ func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
 	return db.UpdateContext(context.Background(), sqlHead, args...)
 }
 
-func (db *DB) SetFieldParser(f func(field *reflect.StructField) string) {
+func (db *DB) SetFieldParser(f FieldParser) {
 	db.fieldNameParser = f
 }
 

@@ -9,11 +9,13 @@ import (
 	"sync"
 )
 
+type FieldParser func(field *reflect.StructField) string
+
 func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
 	return fmt.Sprintf("%v/%v/%v", opTyp, query, typ.String())
 }
 
-func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map, key string, rawScan bool) error {
+func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *sync.Map, key string, rawScan bool) error {
 	dstTyp := reflect.TypeOf(dst)
 	// if !isStructPtr(dstTyp) {
 	// 	return fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, dstTyp)
@@ -81,7 +83,7 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser func(field *reflect.St
 	return nil
 }
 
-func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map, key string, rawScan bool) error {
+func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *sync.Map, key string, rawScan bool) error {
 	dstTyp := reflect.TypeOf(dst)
 	if !isStructSlicePtr(dstTyp) {
 		return fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, dstTyp)
@@ -178,7 +180,7 @@ type InsertInfo struct {
 	FieldIndexes map[string]int
 }
 
-func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser func(field *reflect.StructField) string) (*InsertInfo, error) {
+func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*InsertInfo, error) {
 	var info *InsertInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
@@ -266,7 +268,7 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	return info, nil
 }
 
-func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, data interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map) (Result, error) {
+func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, data interface{}, parser FieldParser, mapping *sync.Map) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
@@ -361,7 +363,7 @@ INIT_FIELD_VALUES:
 	return newResult(result, stmt.query, fieldValues), err
 }
 
-func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser func(field *reflect.StructField) string) (*InsertInfo, error) {
+func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*InsertInfo, error) {
 	var info *InsertInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
@@ -380,7 +382,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 				posEnd = len(sqlHead)
 			}
 			if posEnd < posBegin {
-				return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
+				return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypUpdate, sqlHead)
 			}
 			fieldsStr := sqlHead[posBegin+3 : posEnd]
 			fields := strings.Split(fieldsStr, ",")
@@ -393,6 +395,8 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 					fieldNamesMap[fieldName] = struct{}{}
 				}
 			}
+		} else {
+			return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypUpdate, sqlHead)
 		}
 		initFiedNames := func(typ reflect.Type) {
 			if len(fieldNames) == 0 {
@@ -406,7 +410,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 				}
 
 				if !strings.Contains(sqlHead, "set") {
-					sqlHead += " set "
+					sqlHead = " set " + sqlHead
 				}
 
 				for i, fieldName := range fieldNames {
@@ -434,13 +438,12 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			mapping.Store(key, info)
 		}
 
-	INIT_FIELD_NAMES:
 		switch dataTyp.Kind() {
 		case reflect.Struct:
 			initFiedNames(dataTyp)
 		case reflect.Ptr:
 			dataTyp = dataTyp.Elem()
-			goto INIT_FIELD_NAMES
+			initFiedNames(dataTyp)
 		default:
 		}
 	}
@@ -448,7 +451,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	return info, nil
 }
 
-func updateContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, data interface{}, parser func(field *reflect.StructField) string, mapping *sync.Map) (Result, error) {
+func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, sqlHead string, data interface{}, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
@@ -475,10 +478,15 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 		dataVal = dataVal.Elem()
 	}
 
+	fieldValues = make([]interface{}, len(info.FieldNames)+len(args))[0:0]
 	for _, fieldName := range info.FieldNames {
 		if idx, ok := info.FieldIndexes[fieldName]; ok {
 			fieldValues = append(fieldValues, dataVal.Field(idx).Interface())
 		}
+	}
+
+	if len(args) > 0 {
+		fieldValues = append(fieldValues, args...)
 	}
 
 	if !isStmt {

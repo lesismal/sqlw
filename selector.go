@@ -15,7 +15,7 @@ type Selector interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-func queryRowContext(ctx context.Context, selector Selector, parser func(field *reflect.StructField) string, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
+func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
 	if dst == nil {
 		return fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
 	}
@@ -29,7 +29,7 @@ func queryRowContext(ctx context.Context, selector Selector, parser func(field *
 	return rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 }
 
-func queryContext(ctx context.Context, selector Selector, parser func(field *reflect.StructField) string, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
+func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) error {
 	rows, err := selector.QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
@@ -43,29 +43,38 @@ func queryContext(ctx context.Context, selector Selector, parser func(field *ref
 	return rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 }
 
-func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, parser func(field *reflect.StructField) string, mapping *sync.Map, query string, args ...interface{}) (Result, error) {
-	isStructArg := false
-	if len(args) == 1 {
-		arg := args[0]
-		typ := reflect.TypeOf(arg)
+func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, query string, args ...interface{}) (Result, error) {
+	var obj interface{}
+	if len(args) > 0 {
+		typ := reflect.TypeOf(args[0])
 		if isStruct(typ) {
-			if _, ok := arg.(time.Time); !ok {
-				isStructArg = true
+			if _, ok := args[0].(time.Time); !ok {
+				obj = args[0]
+				args = args[1:]
 			}
 		} else if isStructPtr(typ) {
-			if _, ok := arg.(*time.Time); !ok {
-				isStructArg = true
+			if _, ok := args[0].(*time.Time); !ok {
+				obj = args[0]
+				args = args[1:]
 			}
 		}
 	}
 
-	if !isStructArg {
-		result, err := selector.ExecContext(ctx, query, args...)
+	if obj == nil {
+		if selector != nil {
+			result, err := selector.ExecContext(ctx, query, args...)
+			if err != nil {
+				return nil, err
+			}
+			return newResult(result, query, args), err
+		}
+
+		result, err := stmt.ExecContext(ctx, args...)
 		if err != nil {
 			return nil, err
 		}
 		return newResult(result, query, args), err
 	}
 
-	return updateContext(ctx, selector, nil, query, args[0], parser, mapping)
+	return updateContext(ctx, selector, stmt, parser, mapping, query, obj, args...)
 }
