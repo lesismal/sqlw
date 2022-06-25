@@ -129,6 +129,10 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser func(field *reflect.Str
 		row = newFields(len(columns))
 		defer releaseFields(row)
 	}
+
+	if dstValue.Len() > 0 {
+		dstValue.Set(dstValue.Slice(0, 0))
+	}
 	for rows.Next() {
 		dstElemVal := reflect.Indirect(reflect.New(elemTyp))
 		if rawScan {
@@ -342,7 +346,7 @@ INIT_FIELD_VALUES:
 
 		query := info.SqlHead + sqlTail
 		result, err := selector.ExecContext(ctx, query, fieldValues...)
-		return newResult(result, query), err
+		return newResult(result, query, fieldValues), err
 	}
 
 	for _, item := range insertItems {
@@ -354,7 +358,7 @@ INIT_FIELD_VALUES:
 	}
 
 	result, err := stmt.ExecContext(ctx, fieldValues...)
-	return newResult(result, stmt.query), err
+	return newResult(result, stmt.query, fieldValues), err
 }
 
 func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser func(field *reflect.StructField) string) (*InsertInfo, error) {
@@ -372,14 +376,18 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 		if posBegin := strings.Index(sqlHead, "set"); posBegin > 1 { // table name and space, at least 2 characters
 			fieldNamesMap = map[string]struct{}{}
 			posEnd := strings.Index(sqlHead, "where")
-			if posEnd < 0 || posEnd < posBegin {
+			if posEnd < 0 {
+				posEnd = len(sqlHead)
+			}
+			if posEnd < posBegin {
 				return nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
 			}
 			fieldsStr := sqlHead[posBegin+3 : posEnd]
 			fields := strings.Split(fieldsStr, ",")
 			for _, v := range fields {
 				arr := strings.Split(v, "=")
-				if len(arr) == 2 && strings.TrimSpace(arr[2]) == "?" {
+				// if len(arr) == 2 && strings.TrimSpace(arr[1]) == "?" {
+				if len(arr) == 2 {
 					fieldName := strings.TrimSpace(arr[0])
 					fieldNames = append(fieldNames, fieldName)
 					fieldNamesMap[fieldName] = struct{}{}
@@ -476,11 +484,11 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 	if !isStmt {
 		query := info.SqlHead
 		result, err := selector.ExecContext(ctx, query, fieldValues...)
-		return newResult(result, query), err
+		return newResult(result, query, fieldValues), err
 	}
 
 	result, err := stmt.ExecContext(ctx, fieldValues...)
-	return newResult(result, stmt.query), err
+	return newResult(result, stmt.query, fieldValues), err
 }
 
 func isStruct(t reflect.Type) bool {

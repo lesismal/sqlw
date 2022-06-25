@@ -64,7 +64,7 @@ func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, par
 		if err != nil {
 			return nil, err
 		}
-		return newResult(result, query), err
+		return newResult(result, query, args), err
 	}
 
 	return updateContext(ctx, selector, nil, query, args[0], parser, mapping)
