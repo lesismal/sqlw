@@ -21,7 +21,7 @@ go get github.com/lesismal/sqlw
 ### Define Model
 
 **Noted**: 
-1. The `db` tags of the struct are used to map struct fields to sql table fields.
+1. The `db` tags of the struct are used to map struct fields to sql table fields in our `insert/update/select` operations.
 2. If you want to use some tools to auto-generate struct or sql table but the tools use different struct tag names, you can set the tag when `sqlw.Open`, or modify it using `db.SetTag()`.
 
 ```golang
@@ -168,7 +168,7 @@ log.Println("sql:", result.Sql())
 
 ### Get RawSql
 
-> All `Query/QueryRow/Exec/Insert/Delete/Update/Select/SelectOne` func of `sqlw.DB/Tx/Stmt` return 
+> All `Query/QueryRow/Exec/Insert/Delete/Update/Select/SelectOne` related funcs of `sqlw.DB/Tx/Stmt` return 
 > `(sqlw.Result, error)`.
 > The `sqlw.Result` would always be a non-nil value to help users getting the raw sql, we can use 
 > `sqlw.Result.Sql()` to print it out.
