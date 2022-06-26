@@ -142,9 +142,10 @@ log.Println("sql:", result.Sql())
 
 ### Get RawSql
 
-> All `Query/QueryRow/Exec/Insert/Delete/Update/Select/SelectOne` func of `sqlw.DB/Tx/Stmt` return `(sqlw.Result, error)`.
-
-> The `sqlw.Result` would always be a non-nil value to help users getting the raw sql, we can use `sqlw.Result.Sql()` to print it out.
+> All `Query/QueryRow/Exec/Insert/Delete/Update/Select/SelectOne` func of `sqlw.DB/Tx/Stmt` return 
+> `(sqlw.Result, error)`.
+> The `sqlw.Result` would always be a non-nil value to help users getting the raw sql, we can use 
+> `sqlw.Result.Sql()` to print it out.
 
 For example:
 ```golang
