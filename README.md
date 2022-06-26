@@ -20,7 +20,9 @@ go get github.com/lesismal/sqlw
 
 ### Define Model
 
-**Noted**: The `db` tags of the struct is used to mapping struct fields to sql table fields.
+**Noted**: 
+1. The `db` tags of the struct are used to map struct fields to sql table fields.
+2. If you want to use some tools to auto-generate struct or sql table but the tools use different struct tag names, you can set the tag when `sqlw.Open`, or modify it using `db.SetTag()`.
 
 ```golang
 type Model struct {
@@ -30,7 +32,6 @@ type Model struct {
 }
 ```
 
-
 ### Open DB
 
 ```golang
@@ -39,6 +40,8 @@ import (
     "github.com/lesismal/sqlw"
 )
 
+// "db" is Model struct tag name, if you want to use some tool to auto-generate struct or sql table, 
+// you can set the tag name according to your tools.
 db, err := sqlw.Open("mysql", SqlConnStr, "db")
 if err != nil {
     // handle err

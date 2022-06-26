@@ -128,6 +128,10 @@ func (db *DB) Tag() string {
 	return db.tag
 }
 
+func (db *DB) SetTag(tag string) {
+	db.tag = tag
+}
+
 func (db *DB) Mapping() *sync.Map {
 	return db.mapping
 }
