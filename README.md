@@ -18,6 +18,19 @@ go get github.com/lesismal/sqlw
 
 ## Usage
 
+### Define Model
+
+**Noted**: The `db` tags of the struct is used to mapping struct fields to sql table fields.
+
+```golang
+type Model struct {
+	Id int64  `db:"id"`
+	I  int64  `db:"i"`
+	S  string `db:"s"`
+}
+```
+
+
 ### Open DB
 
 ```golang
@@ -61,21 +74,33 @@ if err != nil {
 // curd logic using stmt
 ```
 
-### Insert
+### Insert One Records
 
 ```golang
-type Model struct {
-	Id int64  `db:"id"`
-	I  int64  `db:"i"`
-	S  string `db:"s"`
-}
-
-m := Model{
+model := Model{
     I: 1,
     S: "str_1",
 }
 
-result, err := db.Insert("insert into sqlw_test.sqlw_test", &m)
+result, err := db.Insert("insert into sqlw_test.sqlw_test", &model)
+if err != nil {
+    log.Panic(err)
+}
+log.Println("sql:", result.Sql())
+```
+
+### Insert Multi Records
+
+```golang
+var models []*Model
+for i:=0; i<3; i++{
+    models = append(models, &Model{
+        I: i,
+        S: fmt.Sprintf("str_%v", i),
+    })
+}
+
+result, err := db.Insert("insert into sqlw_test.sqlw_test", models)
 if err != nil {
     log.Panic(err)
 }
@@ -96,15 +121,9 @@ log.Println("sql:", result.Sql())
 ### Update
 
 ```golang
-type Model struct {
-	Id int64  `db:"id"`
-	I  int64  `db:"i"`
-	S  string `db:"s"`
-}
-
 m := Model{
-    I: 1,
-    S: "str_1",
+    I: 10,
+    S: "str_10",
 }
 
 updateId := 1
@@ -115,7 +134,7 @@ if err != nil {
 log.Println("sql:", result.Sql())
 ```
 
-### Select
+### Select One Record
 
 ```golang
 var model Model
@@ -127,7 +146,11 @@ if err != nil {
 }
 log.Println("model:", model)
 log.Println("sql:", result.Sql())
+```
 
+### Select Multi Records
+
+```golang
 var models []*Model // type []Model is also fine
 result, err = db.SelectOne(&models, "select * from sqlw_test.sqlw_test")
 // result, err = db.SelectOne(&models, "select (i,s) from sqlw_test.sqlw_test") // select some fields
