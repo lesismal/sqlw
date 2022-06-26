@@ -17,6 +17,15 @@ func (stmt *Stmt) Sql(ctx context.Context, dst interface{}, args ...interface{})
 	return stmt.query
 }
 
+func (stmt *Stmt) ExecContext(ctx context.Context, args ...interface{}) (Result, error) {
+	result, err := stmt.Stmt.ExecContext(ctx, args...)
+	return newResult(result, stmt.query, args), err
+}
+
+func (stmt *Stmt) Exec(args ...interface{}) (Result, error) {
+	return stmt.ExecContext(context.Background(), args...)
+}
+
 func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
 	if dst == nil {
 		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
@@ -56,12 +65,24 @@ func (stmt *Stmt) Query(dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 
-func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
+func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(ctx, dst, args...)
 }
 
-func (stmt *Stmt) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
+func (stmt *Stmt) Select(dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(context.Background(), dst, args...)
+}
+
+func (stmt *Stmt) SelectOneContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
+	typ := reflect.TypeOf(dst)
+	if !isStructPtr(typ) {
+		return newResult(nil, stmt.query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
+	}
+	return stmt.SelectContext(ctx, dst, args...)
+}
+
+func (stmt *Stmt) SelectOne(dst interface{}, args ...interface{}) (Result, error) {
+	return stmt.SelectOneContext(context.Background(), dst, args...)
 }
 
 func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Result, error) {
@@ -78,6 +99,15 @@ func (stmt *Stmt) UpdateContext(ctx context.Context, args ...interface{}) (Resul
 
 func (stmt *Stmt) Update(args ...interface{}) (Result, error) {
 	return stmt.UpdateContext(context.Background(), args...)
+}
+
+func (stmt *Stmt) DeleteContext(ctx context.Context, args ...interface{}) (Result, error) {
+	result, err := stmt.Stmt.ExecContext(ctx, args...)
+	return newResult(result, stmt.query, args), err
+}
+
+func (stmt *Stmt) Delete(args ...interface{}) (Result, error) {
+	return stmt.DeleteContext(context.Background(), args...)
 }
 
 func NewStmt(db *DB, stmt *sql.Stmt, query string) *Stmt {

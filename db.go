@@ -3,6 +3,7 @@ package sqlw
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sync"
 )
@@ -35,6 +36,15 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 		DB: db,
 		Tx: tx,
 	}, nil
+}
+
+func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
+	result, err := db.DB.ExecContext(ctx, query, args...)
+	return newResult(result, query, args), err
+}
+
+func (db *DB) Exec(query string, args ...interface{}) (Result, error) {
+	return db.ExecContext(context.Background(), query, args...)
 }
 
 func (db *DB) Prepare(query string) (*Stmt, error) {
@@ -73,6 +83,18 @@ func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result
 	return db.QueryContext(context.Background(), dst, query, args...)
 }
 
+func (db *DB) SelectOneContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
+	typ := reflect.TypeOf(dst)
+	if !isStructPtr(typ) {
+		return newResult(nil, query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
+	}
+	return db.SelectContext(context.Background(), dst, query, args...)
+}
+
+func (db *DB) SelectOne(dst interface{}, query string, args ...interface{}) (Result, error) {
+	return db.SelectOneContext(context.Background(), dst, query, args...)
+}
+
 func (db *DB) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
 	return insertContext(ctx, db.DB, nil, sqlHead, db.parseFieldName, db.mapping, args...)
 }
@@ -87,6 +109,15 @@ func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interfa
 
 func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
 	return db.UpdateContext(context.Background(), sqlHead, args...)
+}
+
+func (db *DB) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
+	result, err := db.DB.ExecContext(ctx, query, args...)
+	return newResult(result, query, args), err
+}
+
+func (db *DB) Delete(query string, args ...interface{}) (Result, error) {
+	return db.DeleteContext(context.Background(), query, args...)
 }
 
 func (db *DB) SetFieldParser(f FieldParser) {

@@ -352,27 +352,29 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 	if raw {
 		if !isStmt {
 			var sqlTail string
-			if !strings.Contains(sqlHead, "values") {
-				sqlTail = " values"
-			}
-			if len(args) > 0 {
-				fieldNames, _, err := parseInsertFields(sqlHead)
-				if err != nil {
-					return nil, err
+			if !strings.Contains(sqlHead, "?") {
+				if !strings.Contains(sqlHead, "values") {
+					sqlTail = " values"
 				}
-				for i := 0; i < len(args); {
-					sqlTail += "("
-					for j := 0; j < len(fieldNames); j++ {
-						sqlTail += "?"
-						if j != len(fieldNames)-1 {
-							sqlTail += ","
-						}
-						i++
+				if len(args) > 0 {
+					fieldNames, _, err := parseInsertFields(sqlHead)
+					if err != nil {
+						return nil, err
 					}
-					if i != len(args) {
-						sqlTail += "),"
-					} else {
-						sqlTail += ")"
+					for i := 0; i < len(args); {
+						sqlTail += "("
+						for j := 0; j < len(fieldNames); j++ {
+							sqlTail += "?"
+							if j != len(fieldNames)-1 {
+								sqlTail += ","
+							}
+							i++
+						}
+						if i != len(args) {
+							sqlTail += "),"
+						} else {
+							sqlTail += ")"
+						}
 					}
 				}
 			}
