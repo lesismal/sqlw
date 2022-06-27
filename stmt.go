@@ -73,17 +73,19 @@ func (stmt *Stmt) Select(dst interface{}, args ...interface{}) (Result, error) {
 	return stmt.QueryContext(context.Background(), dst, args...)
 }
 
-func (stmt *Stmt) SelectOneContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
-	typ := reflect.TypeOf(dst)
-	if !isStructPtr(typ) {
-		return newResult(nil, stmt.query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
-	}
-	return stmt.SelectContext(ctx, dst, args...)
-}
+// deprecated.
+// func (stmt *Stmt) SelectOneContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
+// 	typ := reflect.TypeOf(dst)
+// 	if !isStructPtr(typ) {
+// 		return newResult(nil, stmt.query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
+// 	}
+// 	return stmt.SelectContext(ctx, dst, args...)
+// }
 
-func (stmt *Stmt) SelectOne(dst interface{}, args ...interface{}) (Result, error) {
-	return stmt.SelectOneContext(context.Background(), dst, args...)
-}
+// deprecated.
+// func (stmt *Stmt) SelectOne(dst interface{}, args ...interface{}) (Result, error) {
+// 	return stmt.SelectOneContext(context.Background(), dst, args...)
+// }
 
 func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Result, error) {
 	return insertContext(ctx, nil, stmt, stmt.query, stmt.parseFieldName, stmt.mapping, args...)
