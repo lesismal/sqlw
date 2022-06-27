@@ -144,8 +144,8 @@ log.Println("sql:", result.Sql())
 ```golang
 var model Model
 selectId := 1
-result, err := db.SelectOne(&model, "select * from sqlw_test.sqlw_test where id=?", selectId)
-// result, err := db.SelectOne(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // select the specified fields
+result, err := db.Select(&model, "select * from sqlw_test.sqlw_test where id=?", selectId)
+// result, err := db.Select(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // select the specified fields
 if err != nil {
     log.Panic(err)
 }
@@ -157,8 +157,8 @@ log.Println("sql:", result.Sql())
 
 ```golang
 var models []*Model // type []Model is also fine
-result, err = db.SelectOne(&models, "select * from sqlw_test.sqlw_test")
-// result, err = db.SelectOne(&models, "select (i,s) from sqlw_test.sqlw_test") // select the specified fields
+result, err = db.Select(&models, "select * from sqlw_test.sqlw_test")
+// result, err = db.Select(&models, "select (i,s) from sqlw_test.sqlw_test") // select the specified fields
 if err != nil {
     log.Panic(err)
 }
@@ -170,7 +170,7 @@ log.Println("sql:", result.Sql())
 
 ### Get RawSql
 
-> All `Query/QueryRow/Exec/Insert/Delete/Update/Select/SelectOne` related funcs of `sqlw.DB/Tx/Stmt` return 
+> All `Query/QueryRow/Exec/Insert/Delete/Update/Select` related funcs of `sqlw.DB/Tx/Stmt` return 
 > `(sqlw.Result, error)`.
 > The `sqlw.Result` would always be a non-nil value to help users getting the raw sql, we can use 
 > `sqlw.Result.Sql()` to print it out.
