@@ -23,7 +23,7 @@ func (stmt *Stmt) ExecContext(ctx context.Context, args ...interface{}) (Result,
 }
 
 func (stmt *Stmt) Exec(args ...interface{}) (Result, error) {
-	return stmt.ExecContext(context.Background(), args...)
+	return stmt.ExecContext(stmt.ctx, args...)
 }
 
 func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
@@ -42,7 +42,7 @@ func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...
 }
 
 func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) (Result, error) {
-	return stmt.QueryRowContext(context.Background(), dst, args...)
+	return stmt.QueryRowContext(stmt.ctx, dst, args...)
 }
 
 func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
@@ -62,7 +62,7 @@ func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...int
 }
 
 func (stmt *Stmt) Query(dst interface{}, args ...interface{}) (Result, error) {
-	return stmt.QueryContext(context.Background(), dst, args...)
+	return stmt.QueryContext(stmt.ctx, dst, args...)
 }
 
 func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, args ...interface{}) (Result, error) {
@@ -70,7 +70,7 @@ func (stmt *Stmt) SelectContext(ctx context.Context, dst interface{}, args ...in
 }
 
 func (stmt *Stmt) Select(dst interface{}, args ...interface{}) (Result, error) {
-	return stmt.QueryContext(context.Background(), dst, args...)
+	return stmt.QueryContext(stmt.ctx, dst, args...)
 }
 
 // deprecated.
@@ -84,7 +84,7 @@ func (stmt *Stmt) Select(dst interface{}, args ...interface{}) (Result, error) {
 
 // deprecated.
 // func (stmt *Stmt) SelectOne(dst interface{}, args ...interface{}) (Result, error) {
-// 	return stmt.SelectOneContext(context.Background(), dst, args...)
+// 	return stmt.SelectOneContext(stmt.ctx , dst, args...)
 // }
 
 func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Result, error) {
@@ -92,7 +92,7 @@ func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Resul
 }
 
 func (stmt *Stmt) Insert(args ...interface{}) (Result, error) {
-	return stmt.InsertContext(context.Background(), args...)
+	return stmt.InsertContext(stmt.ctx, args...)
 }
 
 func (stmt *Stmt) UpdateContext(ctx context.Context, args ...interface{}) (Result, error) {
@@ -100,7 +100,7 @@ func (stmt *Stmt) UpdateContext(ctx context.Context, args ...interface{}) (Resul
 }
 
 func (stmt *Stmt) Update(args ...interface{}) (Result, error) {
-	return stmt.UpdateContext(context.Background(), args...)
+	return stmt.UpdateContext(stmt.ctx, args...)
 }
 
 func (stmt *Stmt) DeleteContext(ctx context.Context, args ...interface{}) (Result, error) {
@@ -109,7 +109,7 @@ func (stmt *Stmt) DeleteContext(ctx context.Context, args ...interface{}) (Resul
 }
 
 func (stmt *Stmt) Delete(args ...interface{}) (Result, error) {
-	return stmt.DeleteContext(context.Background(), args...)
+	return stmt.DeleteContext(stmt.ctx, args...)
 }
 
 func NewStmt(db *DB, stmt *sql.Stmt, query string) *Stmt {

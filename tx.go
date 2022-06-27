@@ -16,7 +16,7 @@ func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}
 }
 
 func (tx *Tx) Exec(query string, args ...interface{}) (Result, error) {
-	return tx.ExecContext(context.Background(), query, args...)
+	return tx.ExecContext(tx.ctx, query, args...)
 }
 
 func (tx *Tx) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -24,7 +24,7 @@ func (tx *Tx) QueryRowContext(ctx context.Context, dst interface{}, query string
 }
 
 func (tx *Tx) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return tx.QueryRowContext(context.Background(), dst, query, args...)
+	return tx.QueryRowContext(tx.ctx, dst, query, args...)
 }
 
 func (tx *Tx) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -32,7 +32,7 @@ func (tx *Tx) QueryContext(ctx context.Context, dst interface{}, query string, a
 }
 
 func (tx *Tx) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return tx.QueryContext(context.Background(), dst, query, args...)
+	return tx.QueryContext(tx.ctx, dst, query, args...)
 }
 
 func (tx *Tx) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -40,7 +40,7 @@ func (tx *Tx) SelectContext(ctx context.Context, dst interface{}, query string, 
 }
 
 func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return tx.QueryContext(context.Background(), dst, query, args...)
+	return tx.QueryContext(tx.ctx, dst, query, args...)
 }
 
 // deprecated.
@@ -49,12 +49,12 @@ func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) (Result
 // 	if !isStructPtr(typ) {
 // 		return newResult(nil, query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
 // 	}
-// 	return tx.SelectContext(context.Background(), dst, query, args...)
+// 	return tx.SelectContext(tx.ctx , dst, query, args...)
 // }
 
 // deprecated.
 // func (tx *Tx) SelectOne(dst interface{}, query string, args ...interface{}) (Result, error) {
-// 	return tx.SelectOneContext(context.Background(), dst, query, args...)
+// 	return tx.SelectOneContext(tx.ctx , dst, query, args...)
 // }
 
 func (tx *Tx) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
@@ -62,7 +62,7 @@ func (tx *Tx) InsertContext(ctx context.Context, sqlHead string, args ...interfa
 }
 
 func (tx *Tx) Insert(sqlHead string, args ...interface{}) (Result, error) {
-	return tx.InsertContext(context.Background(), sqlHead, args...)
+	return tx.InsertContext(tx.ctx, sqlHead, args...)
 }
 
 func (tx *Tx) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
@@ -70,7 +70,7 @@ func (tx *Tx) UpdateContext(ctx context.Context, sqlHead string, args ...interfa
 }
 
 func (tx *Tx) Update(sqlHead string, args ...interface{}) (Result, error) {
-	return tx.UpdateContext(context.Background(), sqlHead, args...)
+	return tx.UpdateContext(tx.ctx, sqlHead, args...)
 }
 
 func (tx *Tx) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
@@ -79,7 +79,7 @@ func (tx *Tx) DeleteContext(ctx context.Context, query string, args ...interface
 }
 
 func (tx *Tx) Delete(query string, args ...interface{}) (Result, error) {
-	return tx.DeleteContext(context.Background(), query, args...)
+	return tx.DeleteContext(tx.ctx, query, args...)
 }
 
 func (tx *Tx) PrepareContext(ctx context.Context, query string) (*Stmt, error) {

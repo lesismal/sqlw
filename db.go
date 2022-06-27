@@ -13,6 +13,9 @@ type DB struct {
 	rawScan         bool
 	mapping         *sync.Map
 	fieldNameParser FieldParser
+
+	ctx    context.Context
+	cancel func()
 }
 
 func (db *DB) Begin() (*Tx, error) {
@@ -43,11 +46,11 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 }
 
 func (db *DB) Exec(query string, args ...interface{}) (Result, error) {
-	return db.ExecContext(context.Background(), query, args...)
+	return db.ExecContext(db.ctx, query, args...)
 }
 
 func (db *DB) Prepare(query string) (*Stmt, error) {
-	return db.PrepareContext(context.Background(), query)
+	return db.PrepareContext(db.ctx, query)
 }
 
 func (db *DB) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
@@ -63,7 +66,7 @@ func (db *DB) QueryRowContext(ctx context.Context, dst interface{}, query string
 }
 
 func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return db.QueryRowContext(context.Background(), dst, query, args...)
+	return db.QueryRowContext(db.ctx, dst, query, args...)
 }
 
 func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -71,7 +74,7 @@ func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, a
 }
 
 func (db *DB) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return db.QueryContext(context.Background(), dst, query, args...)
+	return db.QueryContext(db.ctx, dst, query, args...)
 }
 
 func (db *DB) SelectContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -79,7 +82,7 @@ func (db *DB) SelectContext(ctx context.Context, dst interface{}, query string, 
 }
 
 func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return db.QueryContext(context.Background(), dst, query, args...)
+	return db.QueryContext(db.ctx, dst, query, args...)
 }
 
 // deprecated.
@@ -88,12 +91,12 @@ func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result
 // 	if !isStructPtr(typ) {
 // 		return newResult(nil, query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
 // 	}
-// 	return db.SelectContext(context.Background(), dst, query, args...)
+// 	return db.SelectContext(db.ctx, dst, query, args...)
 // }
 
 // deprecated.
 // func (db *DB) SelectOne(dst interface{}, query string, args ...interface{}) (Result, error) {
-// 	return db.SelectOneContext(context.Background(), dst, query, args...)
+// 	return db.SelectOneContext(db.ctx, dst, query, args...)
 // }
 
 func (db *DB) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
@@ -101,7 +104,7 @@ func (db *DB) InsertContext(ctx context.Context, sqlHead string, args ...interfa
 }
 
 func (db *DB) Insert(sqlHead string, args ...interface{}) (Result, error) {
-	return db.InsertContext(context.Background(), sqlHead, args...)
+	return db.InsertContext(db.ctx, sqlHead, args...)
 }
 
 func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
@@ -109,7 +112,7 @@ func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interfa
 }
 
 func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
-	return db.UpdateContext(context.Background(), sqlHead, args...)
+	return db.UpdateContext(db.ctx, sqlHead, args...)
 }
 
 func (db *DB) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
@@ -118,11 +121,17 @@ func (db *DB) DeleteContext(ctx context.Context, query string, args ...interface
 }
 
 func (db *DB) Delete(query string, args ...interface{}) (Result, error) {
-	return db.DeleteContext(context.Background(), query, args...)
+	return db.DeleteContext(db.ctx, query, args...)
 }
 
 func (db *DB) SetFieldParser(f FieldParser) {
 	db.fieldNameParser = f
+}
+
+func (db *DB) Close() error {
+	err := db.DB.Close()
+	db.cancel()
+	return err
 }
 
 func (db *DB) Tag() string {
@@ -131,6 +140,17 @@ func (db *DB) Tag() string {
 
 func (db *DB) SetTag(tag string) {
 	db.tag = tag
+}
+
+func (db *DB) Context() context.Context {
+	return db.ctx
+}
+
+func (db *DB) SetContext(ctx context.Context) {
+	if ctx != nil {
+		db.ctx = ctx
+		db.cancel = func() {}
+	}
 }
 
 func (db *DB) Mapping() *sync.Map {
@@ -153,29 +173,32 @@ func (db *DB) parseFieldName(field *reflect.StructField) string {
 }
 
 func Open(driverName, dataSourceName string, tag string) (*DB, error) {
+	return OpenContext(nil, driverName, dataSourceName, tag)
+}
+
+func OpenContext(ctx context.Context, driverName, dataSourceName string, tag string) (*DB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, err
 	}
-	if tag == "" {
-		tag = "db"
-	}
-	return &DB{
-		DB:      db,
-		tag:     tag,
-		rawScan: true,
-		mapping: &sync.Map{},
-	}, err
+	return WrapContext(ctx, db, tag), err
 }
 
 func Wrap(db *sql.DB, tag string) *DB {
-	if tag == "" {
-		tag = "db"
-	}
-	return &DB{
+	return WrapContext(nil, db, tag)
+}
+
+func WrapContext(ctx context.Context, db *sql.DB, tag string) *DB {
+	sqlwDB := &DB{
 		DB:      db,
 		tag:     tag,
 		rawScan: true,
 		mapping: &sync.Map{},
+		ctx:     ctx,
+		cancel:  func() {},
 	}
+	if ctx == nil {
+		sqlwDB.ctx, sqlwDB.cancel = context.WithCancel(context.Background())
+	}
+	return sqlwDB
 }
