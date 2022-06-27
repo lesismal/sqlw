@@ -488,9 +488,11 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			fields := strings.Split(fieldsStr, ",")
 			for _, v := range fields {
 				arr := strings.Split(v, "=")
-				// if len(arr) == 2 && strings.TrimSpace(arr[1]) == "?" {
-				if len(arr) == 2 {
+				if len(arr) == 2 && strings.TrimSpace(arr[1]) == "?" {
 					fieldName := strings.TrimSpace(arr[0])
+					if pos := strings.Index(fieldName, "."); pos > 0 {
+						fieldName = fieldName[pos+1:]
+					}
 					fieldNames = append(fieldNames, fieldName)
 					fieldNamesMap[fieldName] = struct{}{}
 				}
