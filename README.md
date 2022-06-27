@@ -86,6 +86,7 @@ model := Model{
 }
 
 result, err := db.Insert("insert into sqlw_test.sqlw_test", &model)
+// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", &model) // insert the specified fields
 if err != nil {
     log.Panic(err)
 }
@@ -104,6 +105,7 @@ for i:=0; i<3; i++{
 }
 
 result, err := db.Insert("insert into sqlw_test.sqlw_test", models)
+// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", models) // insert the specified fields
 if err != nil {
     log.Panic(err)
 }
@@ -143,7 +145,7 @@ log.Println("sql:", result.Sql())
 var model Model
 selectId := 1
 result, err := db.SelectOne(&model, "select * from sqlw_test.sqlw_test where id=?", selectId)
-// result, err := db.SelectOne(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // select some fields
+// result, err := db.SelectOne(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // select the specified fields
 if err != nil {
     log.Panic(err)
 }
@@ -156,7 +158,7 @@ log.Println("sql:", result.Sql())
 ```golang
 var models []*Model // type []Model is also fine
 result, err = db.SelectOne(&models, "select * from sqlw_test.sqlw_test")
-// result, err = db.SelectOne(&models, "select (i,s) from sqlw_test.sqlw_test") // select some fields
+// result, err = db.SelectOne(&models, "select (i,s) from sqlw_test.sqlw_test") // select the specified fields
 if err != nil {
     log.Panic(err)
 }
