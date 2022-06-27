@@ -3,8 +3,6 @@ package sqlw
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"reflect"
 )
 
 type Tx struct {
@@ -45,17 +43,19 @@ func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) (Result
 	return tx.QueryContext(context.Background(), dst, query, args...)
 }
 
-func (tx *Tx) SelectOneContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
-	typ := reflect.TypeOf(dst)
-	if !isStructPtr(typ) {
-		return newResult(nil, query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
-	}
-	return tx.SelectContext(context.Background(), dst, query, args...)
-}
+// deprecated.
+// func (tx *Tx) SelectOneContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
+// 	typ := reflect.TypeOf(dst)
+// 	if !isStructPtr(typ) {
+// 		return newResult(nil, query, args), fmt.Errorf("[sqlw %v] invalid dest type: %v", opTypSelect, typ)
+// 	}
+// 	return tx.SelectContext(context.Background(), dst, query, args...)
+// }
 
-func (tx *Tx) SelectOne(dst interface{}, query string, args ...interface{}) (Result, error) {
-	return tx.SelectOneContext(context.Background(), dst, query, args...)
-}
+// deprecated.
+// func (tx *Tx) SelectOne(dst interface{}, query string, args ...interface{}) (Result, error) {
+// 	return tx.SelectOneContext(context.Background(), dst, query, args...)
+// }
 
 func (tx *Tx) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
 	return insertContext(ctx, tx.Tx, nil, sqlHead, tx.parseFieldName, tx.mapping, args...)
