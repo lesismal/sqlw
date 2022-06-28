@@ -10,19 +10,19 @@
 [6]: LICENSE
 
 
-## Install
+## 安装
 
 ```sh
 go get github.com/lesismal/sqlw
 ```
 
-## Usage
+## 使用
 
-### Define Model
+### 定义结构
 
 **Noted**: 
-1. The `db` tags of the struct are used to map struct fields to sql table fields in our `insert/update/select` operations.
-2. If you want to use some tools to auto-generate structs or sql tables but the tools use different struct tag names, you can set the tag when `sqlw.Open`, or modify it using `db.SetTag()`.
+1. 这里示例的结构体标签`db`，用于映射结构体与sql的表字段。
+2. 如果您想使用一些三方工具自动生成结构体或sql表，但是三方工具有自定义的结构体标签，您可以在 `sqlw.Open` 时指定结构体标签，或者用 `db.SetTag()` 方法来修改该标签。
 
 ```golang
 type Model struct {
@@ -32,7 +32,7 @@ type Model struct {
 }
 ```
 
-### Open DB
+### 创建sqlw.DB实例
 
 ```golang
 import (
@@ -40,15 +40,14 @@ import (
     "github.com/lesismal/sqlw"
 )
 
-// "db" is Model struct tag name, if you want to use some tools to auto-generate structs or sql tables, 
-// you can set the tag name according to your tools.
+// "db" 是您的结构体用于与sql表字段映射的标签, 如果您使用三方工具自动生成结构体或sql表，您可以根据该工具生成的实际标签作为参数
 db, err := sqlw.Open("mysql", SqlConnStr, "db")
 if err != nil {
     // handle err
 }
 ```
 
-### Transaction
+### 创建/使用事务
 
 ```golang
 tx, err := db.Begin()
@@ -66,7 +65,7 @@ if err != nil {
 ```
 
 
-### Prepare/Stmt
+### 创建/使用Stmt/预编译
 
 ```golang
 stmt, err := db.Prepare(`your sql`)
@@ -77,7 +76,7 @@ if err != nil {
 // curd logic using stmt
 ```
 
-### Insert One Records
+### 插入一条记录
 
 ```golang
 model := Model{
@@ -86,14 +85,14 @@ model := Model{
 }
 
 result, err := db.Insert("insert into sqlw_test.sqlw_test", &model)
-// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", &model) // insert the specified fields
+// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", &model) // 插入结构体指定字段
 if err != nil {
     log.Panic(err)
 }
 log.Println("sql:", result.Sql())
 ```
 
-### Insert Multi Records
+### 插入多条记录
 
 ```golang
 var models []*Model
@@ -105,14 +104,14 @@ for i:=0; i<3; i++{
 }
 
 result, err := db.Insert("insert into sqlw_test.sqlw_test", models)
-// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", models) // insert the specified fields
+// result, err := db.Insert("insert into sqlw_test.sqlw_test(i,s)", models) // 插入结构体指定字段
 if err != nil {
     log.Panic(err)
 }
 log.Println("sql:", result.Sql())
 ```
 
-### Delete
+### 删除记录
 
 ```golang
 deleteId := 1
@@ -123,7 +122,7 @@ if err != nil {
 log.Println("sql:", result.Sql())
 ```
 
-### Update
+### 更新记录
 
 ```golang
 m := Model{
@@ -139,13 +138,13 @@ if err != nil {
 log.Println("sql:", result.Sql())
 ```
 
-### Select One Record
+### 查询单条记录
 
 ```golang
 var model Model
 selectId := 1
 result, err := db.Select(&model, "select * from sqlw_test.sqlw_test where id=?", selectId)
-// result, err := db.Select(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // select the specified fields
+// result, err := db.Select(&model, "select (i,s) from sqlw_test.sqlw_test where id=?", selectId) // 查询结构体指定字段
 if err != nil {
     log.Panic(err)
 }
@@ -153,12 +152,12 @@ log.Println("model:", model)
 log.Println("sql:", result.Sql())
 ```
 
-### Select Multi Records
+### 查询多条记录
 
 ```golang
 var models []*Model // type []Model is also fine
 result, err = db.Select(&models, "select * from sqlw_test.sqlw_test")
-// result, err = db.Select(&models, "select (i,s) from sqlw_test.sqlw_test") // select the specified fields
+// result, err = db.Select(&models, "select (i,s) from sqlw_test.sqlw_test") // 查询结构体指定字段
 if err != nil {
     log.Panic(err)
 }
@@ -168,14 +167,12 @@ for i, v := range models {
 log.Println("sql:", result.Sql())
 ```
 
-### Get RawSql
+### 获取执行的sql语句及参数
 
-> All `Query/QueryRow/Exec/Insert/Delete/Update/Select` related funcs of `sqlw.DB/Tx/Stmt` return 
-> `(sqlw.Result, error)`.
-> The `sqlw.Result` would always be a non-nil value to help users getting the raw sql, we can use 
-> `sqlw.Result.Sql()` to print it out.
+> `sqlw.DB/Tx/Stmt` 的所有 `Query/QueryRow/Exec/Insert/Delete/Update/Select` 相关方法都会返回 `(sqlw.Result, error)`，
+> 其中的 `sqlw.Result` 是非 nil 的，您可以通过 `sqlw.Result.Sql()` 获取实际执行的sql语句及参数并辅助日志或调试。
 
-For example:
+例如：
 ```golang
 result, err := db.Insert(`insert into t(a,b) values(?,?)`, 1, 2)
 if err != nil {
@@ -184,10 +181,10 @@ if err != nil {
 fmt.Println("sql:", result.Sql)
 ```
 
-Output:
+输出：
 ```sh
 sql: insert into t(a,b) values(?,?), [1, 2]
 ```
 
-### For More Examples
-Please refer to: [sqlw_examples](https://github.com/lesismal/sqlw_examples)
+### 更多示例
+请参考：[sqlw_examples](https://github.com/lesismal/sqlw_examples)
