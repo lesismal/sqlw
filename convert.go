@@ -327,7 +327,7 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	return info, nil
 }
 
-func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, parser FieldParser, mapping *sync.Map, args ...interface{}) (Result, error) {
+func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, db *DB, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
@@ -353,35 +353,40 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 		raw = true
 	}
 
+	var needVal = true
+	var sqlTail string
+	if !strings.Contains(sqlHead, "values") {
+		sqlTail = " values"
+	} else if strings.Count(sqlHead, "(") > 1 {
+		needVal = false
+	}
+
 	if raw {
 		if !isStmt {
-			var sqlTail string
-			if !strings.Contains(sqlHead, "?") {
-				if !strings.Contains(sqlHead, "values") {
-					sqlTail = " values"
+			if needVal && len(args) > 0 {
+				fieldNames, _, err := parseInsertFields(sqlHead)
+				if err != nil {
+					return nil, err
 				}
-				if len(args) > 0 {
-					fieldNames, _, err := parseInsertFields(sqlHead)
-					if err != nil {
-						return nil, err
+				valueIdx := 0
+				for i := 0; i < len(args); {
+					sqlTail += "("
+					for j := 0; j < len(fieldNames); j++ {
+						valueIdx++
+						sqlTail += db.placeholderBuilder(valueIdx)
+						if j != len(fieldNames)-1 {
+							sqlTail += ","
+						}
+						i++
 					}
-					for i := 0; i < len(args); {
-						sqlTail += "("
-						for j := 0; j < len(fieldNames); j++ {
-							sqlTail += "?"
-							if j != len(fieldNames)-1 {
-								sqlTail += ","
-							}
-							i++
-						}
-						if i != len(args) {
-							sqlTail += "),"
-						} else {
-							sqlTail += ")"
-						}
+					if i != len(args) {
+						sqlTail += "),"
+					} else {
+						sqlTail += ")"
 					}
 				}
 			}
+
 			result, err := selector.ExecContext(ctx, sqlHead+sqlTail, args...)
 			return newResult(result, sqlHead, args), err
 		}
@@ -391,21 +396,14 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 	}
 
 	var err error
-	var sqlTail string
 	var fieldValues []interface{}
 	var insertItems []reflect.Value
 	var dataVal = reflect.ValueOf(data)
 
-	// if !isStmt {
-	if !strings.Contains(sqlHead, "values") {
-		sqlTail = " values"
-	}
-
-	info, err := getInsertModelInfo(sqlHead, dataTyp, mapping, parser)
+	info, err := getInsertModelInfo(sqlHead, dataTyp, db.mapping, db.parseFieldName)
 	if err != nil {
 		return nil, err
 	}
-	// }
 
 INIT_FIELD_VALUES:
 	switch dataTyp.Kind() {
@@ -433,20 +431,32 @@ INIT_FIELD_VALUES:
 	}
 
 	if !isStmt {
-		for i, item := range insertItems {
-			sqlTail += "("
-			for j, fieldName := range info.FieldNames {
-				if idx, ok := info.FieldIndexes[fieldName]; ok {
-					fieldValues = append(fieldValues, item.Field(idx).Interface())
-					sqlTail += "?"
-					if j != len(info.FieldNames)-1 {
-						sqlTail += ","
+		if needVal {
+			valueIdx := 0
+			for i, item := range insertItems {
+				sqlTail += "("
+				for j, fieldName := range info.FieldNames {
+					if idx, ok := info.FieldIndexes[fieldName]; ok {
+						fieldValues = append(fieldValues, item.Field(idx).Interface())
+						valueIdx++
+						sqlTail += db.placeholderBuilder(valueIdx)
+						if j != len(info.FieldNames)-1 {
+							sqlTail += ","
+						}
 					}
 				}
+				sqlTail += ")"
+				if i != len(insertItems)-1 {
+					sqlTail += ","
+				}
 			}
-			sqlTail += ")"
-			if i != len(insertItems)-1 {
-				sqlTail += ","
+		} else {
+			for _, item := range insertItems {
+				for _, fieldName := range info.FieldNames {
+					if idx, ok := info.FieldIndexes[fieldName]; ok {
+						fieldValues = append(fieldValues, item.Field(idx).Interface())
+					}
+				}
 			}
 		}
 
@@ -467,12 +477,12 @@ INIT_FIELD_VALUES:
 	return newResult(result, stmt.query, fieldValues), err
 }
 
-func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*MappingInfo, error) {
+func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingInfo, error) {
 	var info *MappingInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
-	var stored, ok = mapping.Load(key)
+	var stored, ok = db.mapping.Load(key)
 	if ok {
 		info = stored.(*MappingInfo)
 	} else {
@@ -490,9 +500,11 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			}
 			fieldsStr := sqlHead[posBegin+3 : posEnd]
 			fields := strings.Split(fieldsStr, ",")
+			valueIdx := 0
 			for _, v := range fields {
 				arr := strings.Split(v, "=")
-				if len(arr) == 2 && strings.TrimSpace(arr[1]) == "?" {
+				valueIdx++
+				if len(arr) == 2 && strings.Contains(strings.TrimSpace(arr[1]), db.placeholder) {
 					fieldName := strings.TrimSpace(arr[0])
 					if pos := strings.Index(fieldName, "."); pos > 0 {
 						fieldName = fieldName[pos+1:]
@@ -508,7 +520,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			if len(fieldNames) == 0 {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(parser(&strField))
+					fieldName := strings.ToLower(db.parseFieldName(&strField))
 					if fieldName != "" {
 						fieldNames = append(fieldNames, fieldName)
 						info.FieldIndexes[fieldName] = i
@@ -519,8 +531,10 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 					sqlHead = " set " + sqlHead
 				}
 
+				valueIdx := 0
 				for i, fieldName := range fieldNames {
-					sqlHead += (fieldName + "=?")
+					valueIdx++
+					sqlHead += (fieldName + "=" + db.placeholderBuilder(valueIdx))
 					if i != len(fieldNames)-1 {
 						sqlHead += ","
 					}
@@ -528,7 +542,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			} else {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(parser(&strField))
+					fieldName := strings.ToLower(db.parseFieldName(&strField))
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
 					}
@@ -541,7 +555,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 
 			info.SqlHead = sqlHead
 			info.FieldNames = fieldNames
-			mapping.Store(key, info)
+			db.mapping.Store(key, info)
 		}
 
 		switch dataTyp.Kind() {
@@ -557,7 +571,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	return info, nil
 }
 
-func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, sqlHead string, data interface{}, args ...interface{}) (Result, error) {
+func updateContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, sqlHead string, data interface{}, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
@@ -575,7 +589,7 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser Fi
 	var dataTyp = reflect.TypeOf(data)
 	var dataVal = reflect.ValueOf(data)
 
-	info, err := getUpdateModelInfo(sqlHead, dataTyp, mapping, parser)
+	info, err := getUpdateModelInfo(sqlHead, dataTyp, db)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +619,7 @@ func updateContext(ctx context.Context, selector Selector, stmt *Stmt, parser Fi
 	return newResult(result, stmt.query, fieldValues), err
 }
 
-func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, parser FieldParser, mapping *sync.Map, query string, args ...interface{}) (Result, error) {
+func updateByExecContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, query string, args ...interface{}) (Result, error) {
 	var obj interface{}
 	if len(args) > 0 {
 		typ := reflect.TypeOf(args[0])
@@ -632,7 +646,7 @@ func updateByExecContext(ctx context.Context, selector Selector, stmt *Stmt, par
 		return newResult(result, query, args), err
 	}
 
-	return updateContext(ctx, selector, stmt, parser, mapping, query, obj, args...)
+	return updateContext(ctx, selector, db, stmt, query, obj, args...)
 }
 
 func isStruct(t reflect.Type) bool {
