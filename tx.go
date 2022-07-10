@@ -62,7 +62,7 @@ func (tx *Tx) Select(dst interface{}, query string, args ...interface{}) (Result
 // }
 
 func (tx *Tx) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
-	return insertContext(ctx, tx.Tx, nil, sqlHead, tx.parseFieldName, tx.mapping, args...)
+	return insertContext(ctx, tx.Tx, nil, sqlHead, tx.DB, args...)
 }
 
 func (tx *Tx) Insert(sqlHead string, args ...interface{}) (Result, error) {
@@ -70,7 +70,7 @@ func (tx *Tx) Insert(sqlHead string, args ...interface{}) (Result, error) {
 }
 
 func (tx *Tx) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
-	return updateByExecContext(ctx, tx.Tx, nil, tx.parseFieldName, tx.mapping, sqlHead, args...)
+	return updateByExecContext(ctx, tx.Tx, tx.DB, nil, sqlHead, args...)
 }
 
 func (tx *Tx) Update(sqlHead string, args ...interface{}) (Result, error) {

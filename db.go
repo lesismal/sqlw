@@ -7,19 +7,24 @@ package sqlw
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 )
 
 type DB struct {
 	*sql.DB
-	tag             string
-	rawScan         bool
-	mapping         *sync.Map
-	fieldNameParser FieldParser
+	tag                string
+	placeholder        string
+	placeholderBuilder func(int) string
+	rawScan            bool
+	mapping            *sync.Map
+	fieldNameParser    FieldParser
 
-	ctx    context.Context
-	cancel func()
+	ctx     context.Context
+	cancel  func()
+	isMysql bool
 }
 
 func (db *DB) Begin() (*Tx, error) {
@@ -104,7 +109,7 @@ func (db *DB) Select(dst interface{}, query string, args ...interface{}) (Result
 // }
 
 func (db *DB) InsertContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
-	return insertContext(ctx, db.DB, nil, sqlHead, db.parseFieldName, db.mapping, args...)
+	return insertContext(ctx, db.DB, nil, sqlHead, db, args...)
 }
 
 func (db *DB) Insert(sqlHead string, args ...interface{}) (Result, error) {
@@ -112,7 +117,7 @@ func (db *DB) Insert(sqlHead string, args ...interface{}) (Result, error) {
 }
 
 func (db *DB) UpdateContext(ctx context.Context, sqlHead string, args ...interface{}) (Result, error) {
-	return updateByExecContext(ctx, db.DB, nil, db.parseFieldName, db.mapping, sqlHead, args...)
+	return updateByExecContext(ctx, db.DB, db, nil, sqlHead, args...)
 }
 
 func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
@@ -144,6 +149,22 @@ func (db *DB) Tag() string {
 
 func (db *DB) SetTag(tag string) {
 	db.tag = tag
+}
+
+func (db *DB) Placeholder() string {
+	return db.placeholder
+}
+
+func (db *DB) SetPlaceholder(placeholder string) {
+	db.placeholder = placeholder
+}
+
+func (db *DB) PlaceholderBuilder() func(int) string {
+	return db.placeholderBuilder
+}
+
+func (db *DB) SetPlaceholderBuilder(placeholderBuilder func(int) string) {
+	db.placeholderBuilder = placeholderBuilder
 }
 
 func (db *DB) Context() context.Context {
@@ -185,21 +206,31 @@ func OpenContext(ctx context.Context, driverName, dataSourceName string, tag str
 	if err != nil {
 		return nil, err
 	}
-	return WrapContext(ctx, db, tag), err
+	return WrapContext(ctx, db, driverName, tag), err
 }
 
-func Wrap(db *sql.DB, tag string) *DB {
-	return WrapContext(nil, db, tag)
+func Wrap(db *sql.DB, driverName, tag string) *DB {
+	return WrapContext(nil, db, driverName, tag)
 }
 
-func WrapContext(ctx context.Context, db *sql.DB, tag string) *DB {
+func WrapContext(ctx context.Context, db *sql.DB, driverName, tag string) *DB {
 	sqlwDB := &DB{
-		DB:      db,
-		tag:     tag,
-		rawScan: true,
-		mapping: &sync.Map{},
-		ctx:     ctx,
-		cancel:  func() {},
+		DB:                 db,
+		tag:                tag,
+		placeholder:        "$",
+		placeholderBuilder: func(int) string { return "?" },
+		rawScan:            true,
+		mapping:            &sync.Map{},
+		ctx:                ctx,
+		cancel:             func() {},
+		isMysql:            true,
+	}
+	if !strings.Contains(driverName, "mysql") {
+		sqlwDB.isMysql = false
+		sqlwDB.placeholder = "$"
+		sqlwDB.placeholderBuilder = func(i int) string {
+			return fmt.Sprintf("$%d", i)
+		}
 	}
 	if ctx == nil {
 		sqlwDB.ctx, sqlwDB.cancel = context.WithCancel(context.Background())
