@@ -92,7 +92,7 @@ func (stmt *Stmt) Select(dst interface{}, args ...interface{}) (Result, error) {
 // }
 
 func (stmt *Stmt) InsertContext(ctx context.Context, args ...interface{}) (Result, error) {
-	return insertContext(ctx, nil, stmt, stmt.query, stmt.parseFieldName, stmt.mapping, args...)
+	return insertContext(ctx, nil, stmt, stmt.query, stmt.DB, args...)
 }
 
 func (stmt *Stmt) Insert(args ...interface{}) (Result, error) {
@@ -100,7 +100,7 @@ func (stmt *Stmt) Insert(args ...interface{}) (Result, error) {
 }
 
 func (stmt *Stmt) UpdateContext(ctx context.Context, args ...interface{}) (Result, error) {
-	return updateByExecContext(ctx, nil, stmt, stmt.parseFieldName, stmt.mapping, stmt.query, args...)
+	return updateByExecContext(ctx, nil, stmt.DB, stmt, stmt.query, args...)
 }
 
 func (stmt *Stmt) Update(args ...interface{}) (Result, error) {
