@@ -217,7 +217,7 @@ func WrapContext(ctx context.Context, db *sql.DB, driverName, tag string) *DB {
 	sqlwDB := &DB{
 		DB:                 db,
 		tag:                tag,
-		placeholder:        "$",
+		placeholder:        "?",
 		placeholderBuilder: func(int) string { return "?" },
 		rawScan:            true,
 		mapping:            &sync.Map{},
