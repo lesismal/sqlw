@@ -7,6 +7,7 @@ package sqlw
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -231,15 +232,13 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 	return nil
 }
 
-type emptyStruct struct{}
+var empty = struct{}{}
 
-var empty = emptyStruct{}
-
-func parseInsertFields(sqlHead, sqlHeadLower string) ([]string, map[string]emptyStruct, error) {
+func parseInsertFields(sqlHead, sqlHeadLower string) ([]string, map[string]interface{}, error) {
 	var fieldNames []string
-	var fieldNamesMap map[string]emptyStruct
+	var fieldNamesMap map[string]interface{}
 	if posBegin := strings.Index(sqlHeadLower, "("); posBegin > 1 { // table name and space, at least 2 characters
-		fieldNamesMap = map[string]emptyStruct{}
+		fieldNamesMap = map[string]interface{}{}
 		posEnd := strings.Index(sqlHeadLower, ")")
 		if posEnd < 0 || posEnd < posBegin {
 			return nil, nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
@@ -252,7 +251,7 @@ func parseInsertFields(sqlHead, sqlHeadLower string) ([]string, map[string]empty
 		for i, v := range fieldNames {
 			s := strings.TrimSpace(v)
 			fieldNames[i] = s
-			fieldNamesMap[s] = empty
+			fieldNamesMap[s] = nil
 		}
 	}
 	return fieldNames, fieldNamesMap, nil
@@ -262,7 +261,7 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, mapp
 	var err error
 	var info *MappingInfo
 	var fieldNames []string
-	var fieldNamesMap map[string]emptyStruct
+	var fieldNamesMap map[string]interface{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = mapping.Load(key)
 	if ok {
@@ -299,16 +298,17 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, mapp
 					fieldName := parser(&strField)
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
+						fieldNamesMap[fieldName] = empty
 					}
 				}
 				var emptyFields []string
 				for k, v := range fieldNamesMap {
-					if v == empty {
+					if v == nil {
 						emptyFields = append(emptyFields, k)
 					}
 				}
 				if len(emptyFields) > 0 {
-					return fmt.Errorf(typ.Name() + " doesn't have fields: " + strings.Join(emptyFields, ","))
+					return errors.New("struct " + typ.Name() + " doesn't have tags: [" + strings.Join(emptyFields, ", ") + "]")
 				}
 			}
 
@@ -497,7 +497,7 @@ INIT_FIELD_VALUES:
 func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingInfo, error) {
 	var info *MappingInfo
 	var fieldNames []string
-	var fieldNamesMap map[string]emptyStruct
+	var fieldNamesMap map[string]interface{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = db.mapping.Load(key)
 	var sqlHeadLower = strings.ToLower(sqlHead)
@@ -508,7 +508,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 			FieldIndexes: map[string]int{},
 		}
 		if posBegin := strings.Index(sqlHeadLower, "set"); posBegin > 1 { // table name and space, at least 2 characters
-			fieldNamesMap = map[string]emptyStruct{}
+			fieldNamesMap = map[string]interface{}{}
 			posEnd := strings.Index(sqlHeadLower, "where")
 			if posEnd < 0 {
 				posEnd = len(sqlHead)
@@ -572,7 +572,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 					}
 				}
 				if len(emptyFields) > 0 {
-					return fmt.Errorf(typ.Name() + " doesn't have fields: " + strings.Join(emptyFields, ","))
+					return errors.New("struct " + typ.Name() + " doesn't have tags: [" + strings.Join(emptyFields, ", ") + "]")
 				}
 			}
 
