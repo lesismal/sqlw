@@ -300,15 +300,15 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, mapp
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
 					}
-					var emptyFields []string
-					for k, v := range fieldNamesMap {
-						if v == empty {
-							emptyFields = append(emptyFields, k)
-						}
+				}
+				var emptyFields []string
+				for k, v := range fieldNamesMap {
+					if v == empty {
+						emptyFields = append(emptyFields, k)
 					}
-					if len(emptyFields) > 0 {
-						return fmt.Errorf(typ.Name() + " doesn't have fields: " + strings.Join(emptyFields, ","))
-					}
+				}
+				if len(emptyFields) > 0 {
+					return fmt.Errorf(typ.Name() + " doesn't have fields: " + strings.Join(emptyFields, ","))
 				}
 			}
 
