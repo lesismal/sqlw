@@ -105,6 +105,8 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *
 			for i, fieldName := range columns {
 				if fieldIdx, ok := fieldIdxMap[fieldName]; ok {
 					row[i] = dstValue.Field(fieldIdx).Addr().Interface()
+				} else {
+					row[i] = &Field{}
 				}
 			}
 			if err = rows.Scan(row...); err != nil {

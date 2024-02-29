@@ -181,7 +181,7 @@ result, err := db.Insert(`insert into t(a,b) values(?,?)`, 1, 2)
 if err != nil {
     // handle err
 }
-fmt.Println("sql:", result.Sql)
+fmt.Println("sql:", result.Sql())
 ```
 
 Output:
