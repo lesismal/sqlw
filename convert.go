@@ -74,9 +74,9 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *
 		return err
 	}
 
-	for i, v := range columns {
-		columns[i] = strings.ToLower(v)
-	}
+	// for i, v := range columns {
+	// 	columns[i] = strings.ToLower(v)
+	// }
 
 	var elemTyp = dstTyp.Elem()
 	var fieldIdxMap map[string]int
@@ -91,7 +91,7 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *
 		}
 		for j := 0; j < elemTyp.NumField(); j++ {
 			strField := elemTyp.Field(j)
-			fieldName := strings.ToLower(parser(&strField))
+			fieldName := parser(&strField)
 			if existsMap[fieldName] {
 				fieldIdxMap[fieldName] = j
 			}
@@ -146,9 +146,9 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 		return err
 	}
 
-	for i, v := range columns {
-		columns[i] = strings.ToLower(v)
-	}
+	// for i, v := range columns {
+	// 	columns[i] = strings.ToLower(v)
+	// }
 
 	elemTyp := dstTyp.Elem().Elem()
 	isPtrType := elemTyp.Kind() == reflect.Ptr
@@ -167,7 +167,7 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 		}
 		for j := 0; j < elemTyp.NumField(); j++ {
 			strField := elemTyp.Field(j)
-			fieldName := strings.ToLower(parser(&strField))
+			fieldName := parser(&strField)
 			if existsMap[fieldName] {
 				fieldIdxMap[fieldName] = j
 			}
@@ -231,12 +231,12 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 	return nil
 }
 
-func parseInsertFields(sqlHead string) ([]string, map[string]struct{}, error) {
+func parseInsertFields(sqlHead, sqlHeadLower string) ([]string, map[string]struct{}, error) {
 	var fieldNames []string
 	var fieldNamesMap map[string]struct{}
-	if posBegin := strings.Index(sqlHead, "("); posBegin > 1 { // table name and space, at least 2 characters
+	if posBegin := strings.Index(sqlHeadLower, "("); posBegin > 1 { // table name and space, at least 2 characters
 		fieldNamesMap = map[string]struct{}{}
-		posEnd := strings.Index(sqlHead, ")")
+		posEnd := strings.Index(sqlHeadLower, ")")
 		if posEnd < 0 || posEnd < posBegin {
 			return nil, nil, fmt.Errorf("[sqlw %v] invalid sql: %v", opTypInsert, sqlHead)
 		}
@@ -261,13 +261,14 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 	var fieldNamesMap map[string]struct{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = mapping.Load(key)
+	var sqlHeadLower = strings.ToLower(sqlHead)
 	if ok {
 		info = stored.(*MappingInfo)
 	} else {
 		info = &MappingInfo{
 			FieldIndexes: map[string]int{},
 		}
-		fieldNames, fieldNamesMap, err = parseInsertFields(sqlHead)
+		fieldNames, fieldNamesMap, err = parseInsertFields(sqlHead, sqlHeadLower)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +276,7 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			if len(fieldNames) == 0 {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(parser(&strField))
+					fieldName := parser(&strField)
 					if fieldName != "" {
 						fieldNames = append(fieldNames, fieldName)
 						info.FieldIndexes[fieldName] = i
@@ -292,7 +293,7 @@ func getInsertModelInfo(sqlHead string, dataTyp reflect.Type, mapping *sync.Map,
 			} else {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(parser(&strField))
+					fieldName := parser(&strField)
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
 					}
@@ -335,16 +336,11 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
 	}
 
-	sqlHead = strings.ToLower(sqlHead)
-	// if strings.Contains(sqlHead, opTypSelect) ||
-	// 	strings.Contains(sqlHead, opTypUpdate) ||
-	// 	strings.Contains(sqlHead, opTypDelete) {
-	// 	return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
-	// }
-
 	var raw = false
 	var data interface{}
 	var dataTyp reflect.Type
+	var sqlHeadLower = strings.ToLower(sqlHead)
+
 	if len(args) == 1 {
 		data = args[0]
 		dataTyp = reflect.TypeOf(data)
@@ -357,16 +353,16 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 
 	var needVal = true
 	var sqlTail string
-	if !strings.Contains(sqlHead, "values") {
+	if !strings.Contains(sqlHeadLower, "values") {
 		sqlTail = " values"
-	} else if strings.Count(sqlHead, "(") > 1 {
+	} else if strings.Count(sqlHeadLower, "(") > 1 {
 		needVal = false
 	}
 
 	if raw {
 		if !isStmt {
 			if needVal && len(args) > 0 {
-				fieldNames, _, err := parseInsertFields(sqlHead)
+				fieldNames, _, err := parseInsertFields(sqlHead, sqlHeadLower)
 				if err != nil {
 					return nil, err
 				}
@@ -485,15 +481,16 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 	var fieldNamesMap map[string]struct{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
 	var stored, ok = db.mapping.Load(key)
+	var sqlHeadLower = strings.ToLower(sqlHead)
 	if ok {
 		info = stored.(*MappingInfo)
 	} else {
 		info = &MappingInfo{
 			FieldIndexes: map[string]int{},
 		}
-		if posBegin := strings.Index(sqlHead, "set"); posBegin > 1 { // table name and space, at least 2 characters
+		if posBegin := strings.Index(sqlHeadLower, "set"); posBegin > 1 { // table name and space, at least 2 characters
 			fieldNamesMap = map[string]struct{}{}
-			posEnd := strings.Index(sqlHead, "where")
+			posEnd := strings.Index(sqlHeadLower, "where")
 			if posEnd < 0 {
 				posEnd = len(sqlHead)
 			}
@@ -522,14 +519,14 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 			if len(fieldNames) == 0 {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(db.parseFieldName(&strField))
+					fieldName := db.parseFieldName(&strField)
 					if fieldName != "" {
 						fieldNames = append(fieldNames, fieldName)
 						info.FieldIndexes[fieldName] = i
 					}
 				}
 
-				if !strings.Contains(sqlHead, "set") {
+				if !strings.Contains(sqlHeadLower, "set") {
 					sqlHead = " set " + sqlHead
 				}
 
@@ -544,7 +541,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 			} else {
 				for i := 0; i < typ.NumField(); i++ {
 					strField := typ.Field(i)
-					fieldName := strings.ToLower(db.parseFieldName(&strField))
+					fieldName := db.parseFieldName(&strField)
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
 					}
@@ -578,13 +575,6 @@ func updateContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, s
 	if !isStmt && sqlHead == "" {
 		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
 	}
-
-	sqlHead = strings.ToLower(sqlHead)
-	// if strings.Contains(sqlHead, opTypSelect) ||
-	// 	strings.Contains(sqlHead, opTypInsert) ||
-	// 	strings.Contains(sqlHead, opTypDelete) {
-	// 	return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypUpdate, sqlHead)
-	// }
 
 	var err error
 	var fieldValues []interface{}
