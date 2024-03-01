@@ -16,6 +16,7 @@ import (
 type DB struct {
 	*sql.DB
 	tag                string
+	quote              string
 	placeholder        string
 	placeholderBuilder func(int) string
 	rawScan            bool
@@ -157,6 +158,14 @@ func (db *DB) Placeholder() string {
 
 func (db *DB) SetPlaceholder(placeholder string) {
 	db.placeholder = placeholder
+}
+
+func (db *DB) Quote() string {
+	return db.quote
+}
+
+func (db *DB) SetQuote(quote string) {
+	db.quote = quote
 }
 
 func (db *DB) PlaceholderBuilder() func(int) string {

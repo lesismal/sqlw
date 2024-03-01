@@ -528,7 +528,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 						fieldName = fieldName[pos+1:]
 					}
 					fieldNames = append(fieldNames, fieldName)
-					fieldNamesMap[fieldName] = empty
+					fieldNamesMap[fieldName] = nil
 				}
 			}
 		} else {
@@ -542,6 +542,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 					if fieldName != "" {
 						fieldNames = append(fieldNames, fieldName)
 						info.FieldIndexes[fieldName] = i
+						fieldNamesMap[fieldName] = empty
 					}
 				}
 
@@ -563,11 +564,12 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 					fieldName := db.parseFieldName(&strField)
 					if _, ok := fieldNamesMap[fieldName]; ok {
 						info.FieldIndexes[fieldName] = i
+						fieldNamesMap[fieldName] = empty
 					}
 				}
 				var emptyFields []string
 				for k, v := range fieldNamesMap {
-					if v == empty {
+					if v == nil {
 						emptyFields = append(emptyFields, k)
 					}
 				}
