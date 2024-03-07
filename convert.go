@@ -257,12 +257,13 @@ func parseInsertFields(sqlHead, sqlHeadLower string) ([]string, map[string]inter
 	return fieldNames, fieldNamesMap, nil
 }
 
-func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, mapping *sync.Map, parser FieldParser) (*MappingInfo, error) {
+func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, db *DB, parser FieldParser) (*MappingInfo, error) {
 	var err error
 	var info *MappingInfo
 	var fieldNames []string
 	var fieldNamesMap map[string]interface{}
 	var key = sqlMappingKey(opTypInsert, sqlHead, dataTyp)
+	var mapping = db.mapping
 	var stored, ok = mapping.Load(key)
 	if ok {
 		info = stored.(*MappingInfo)
@@ -286,7 +287,7 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, mapp
 				}
 				sqlHead += "("
 				for i, fieldName := range fieldNames {
-					sqlHead += fieldName
+					sqlHead += db.quote + fieldName + db.quote
 					if i != len(fieldNames)-1 {
 						sqlHead += ","
 					}
@@ -417,7 +418,7 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 	var insertItems []reflect.Value
 	var dataVal = reflect.ValueOf(data)
 
-	info, err := getInsertModelInfo(sqlHead, sqlHeadLower, dataTyp, db.mapping, db.parseFieldName)
+	info, err := getInsertModelInfo(sqlHead, sqlHeadLower, dataTyp, db, db.parseFieldName)
 	if err != nil {
 		return nil, err
 	}
