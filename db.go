@@ -16,6 +16,7 @@ import (
 type DB struct {
 	*sql.DB
 	tag                string
+	quote              string
 	placeholder        string
 	placeholderBuilder func(int) string
 	rawScan            bool
@@ -159,6 +160,14 @@ func (db *DB) SetPlaceholder(placeholder string) {
 	db.placeholder = placeholder
 }
 
+func (db *DB) Quote() string {
+	return db.quote
+}
+
+func (db *DB) SetQuote(quote string) {
+	db.quote = quote
+}
+
 func (db *DB) PlaceholderBuilder() func(int) string {
 	return db.placeholderBuilder
 }
@@ -197,8 +206,10 @@ func (db *DB) parseFieldName(field *reflect.StructField) string {
 	return field.Tag.Get(db.tag)
 }
 
+var nilContext context.Context
+
 func Open(driverName, dataSourceName string, tag string) (*DB, error) {
-	return OpenContext(nil, driverName, dataSourceName, tag)
+	return OpenContext(nilContext, driverName, dataSourceName, tag)
 }
 
 func OpenContext(ctx context.Context, driverName, dataSourceName string, tag string) (*DB, error) {
@@ -210,7 +221,7 @@ func OpenContext(ctx context.Context, driverName, dataSourceName string, tag str
 }
 
 func Wrap(db *sql.DB, driverName, tag string) *DB {
-	return WrapContext(nil, db, driverName, tag)
+	return WrapContext(nilContext, db, driverName, tag)
 }
 
 func WrapContext(ctx context.Context, db *sql.DB, driverName, tag string) *DB {
@@ -232,7 +243,7 @@ func WrapContext(ctx context.Context, db *sql.DB, driverName, tag string) *DB {
 			return fmt.Sprintf("$%d", i)
 		}
 	}
-	if ctx == nil {
+	if ctx == nilContext {
 		sqlwDB.ctx, sqlwDB.cancel = context.WithCancel(context.Background())
 	}
 	return sqlwDB
