@@ -32,7 +32,15 @@ func (r *sqlResult) RowsAffected() (int64, error) {
 }
 
 func (r *sqlResult) Sql() string {
-	return fmt.Sprintf(`"%s", %v`, r.query, r.args)
+	return fmt.Sprintf(`[%s], %v`, r.query, r.args)
+}
+
+func (r *sqlResult) Query() string {
+	return r.query
+}
+
+func (r *sqlResult) Args() []interface{} {
+	return r.args
 }
 
 func newResult(r sql.Result, query string, args []interface{}) Result {
