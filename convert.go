@@ -24,6 +24,8 @@ type MappingInfo struct {
 }
 
 type Selector interface {
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	QueryRow(query string, args ...interface{}) *sql.Row
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
@@ -49,25 +51,30 @@ func queryRowContext(ctx context.Context, selector Selector, parser FieldParser,
 }
 
 func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
-	rows, err := selector.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
 	typ := reflect.TypeOf(dst)
 	if isStructPtr(typ) {
+		rows, err := selector.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
 		err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 		return newResult(nil, query, args), err
 	}
 
 	if isStructSlicePtr(typ) {
+		rows, err := selector.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
 		err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 		return newResult(nil, query, args), err
 	}
 
 	dstValue := reflect.Indirect(reflect.ValueOf(dst))
-	err = rows.Scan(dstValue.Addr().Interface())
+	err := selector.QueryRowContext(ctx, query, args...).Scan(dstValue.Addr().Interface())
 	return newResult(nil, query, args), err
 }
 
