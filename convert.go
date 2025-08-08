@@ -55,12 +55,19 @@ func queryContext(ctx context.Context, selector Selector, parser FieldParser, ds
 	}
 	defer rows.Close()
 
-	if isStructPtr(reflect.TypeOf(dst)) {
+	typ := reflect.TypeOf(dst)
+	if isStructPtr(typ) {
 		err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
 		return newResult(nil, query, args), err
 	}
 
-	err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+	if isStructSlicePtr(typ) {
+		err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
+		return newResult(nil, query, args), err
+	}
+
+	dstValue := reflect.Indirect(reflect.ValueOf(dst))
+	err = rows.Scan(dstValue.Addr().Interface())
 	return newResult(nil, query, args), err
 }
 
