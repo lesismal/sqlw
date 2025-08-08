@@ -327,7 +327,7 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, db *
 				}
 			}
 
-			if !strings.Contains(sqlHead, opTypInsert) {
+			if !strings.Contains(sqlHeadLower, opTypInsert) {
 				sqlHead = "insert into " + sqlHead
 			}
 
