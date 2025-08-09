@@ -4,8 +4,6 @@
 
 package sqlw
 
-import "errors"
-
-var (
-	ErrNotFound = errors.New("not found")
-)
+// var (
+// 	ErrNotFound = errors.New("not found")
+// )

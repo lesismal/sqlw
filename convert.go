@@ -32,7 +32,7 @@ type Selector interface {
 }
 
 func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
-	return fmt.Sprintf("%v/%v/%v", opTyp, query, typ.String())
+	return fmt.Sprintf("%v%v%v", opTyp, query, typ.String())
 }
 
 func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
@@ -143,9 +143,9 @@ func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *
 				}
 			}
 		}
-	} else {
-		return ErrNotFound
-	}
+	} // else {
+	// return ErrNotFound
+	// }
 
 	return nil
 }
@@ -203,9 +203,9 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 		dstValue.Set(dstValue.Slice(0, 0))
 	}
 
-	notFound := true
+	// notFound := true
 	for rows.Next() {
-		notFound = false
+		// notFound = false
 		dstElemVal := reflect.Indirect(reflect.New(elemTyp))
 		if rawScan {
 			for i, fieldName := range columns {
@@ -239,9 +239,9 @@ func rowsToSlice(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *s
 		}
 	}
 
-	if notFound {
-		return ErrNotFound
-	}
+	// if notFound {
+	// 	return ErrNotFound
+	// }
 
 	return nil
 }
