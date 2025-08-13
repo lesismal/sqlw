@@ -11,8 +11,9 @@ import (
 
 type sqlResult struct {
 	sql.Result
-	query string
-	args  []interface{}
+	query    string
+	args     []interface{}
+	notFound bool
 }
 
 type Result = *sqlResult
@@ -43,6 +44,10 @@ func (r *sqlResult) Args() []interface{} {
 	return r.args
 }
 
-func newResult(r sql.Result, query string, args []interface{}) Result {
-	return &sqlResult{r, query, args}
+func (r *sqlResult) IsNotFound() bool {
+	return r.notFound
+}
+
+func newResult(r sql.Result, query string, args []interface{}, notFound bool) Result {
+	return &sqlResult{r, query, args, notFound}
 }

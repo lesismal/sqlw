@@ -52,7 +52,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := db.DB.ExecContext(ctx, query, args...)
-	return newResult(result, query, args), err
+	return newResult(result, query, args, false), err
 }
 
 func (db *DB) Exec(query string, args ...interface{}) (Result, error) {
@@ -127,7 +127,7 @@ func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
 
 func (db *DB) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := db.DB.ExecContext(ctx, query, args...)
-	return newResult(result, query, args), err
+	return newResult(result, query, args, false), err
 }
 
 func (db *DB) Delete(query string, args ...interface{}) (Result, error) {

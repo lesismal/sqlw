@@ -16,7 +16,7 @@ type Tx struct {
 
 func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := tx.Tx.ExecContext(ctx, query, args...)
-	return newResult(result, query, args), err
+	return newResult(result, query, args, false), err
 }
 
 func (tx *Tx) Exec(query string, args ...interface{}) (Result, error) {
@@ -79,7 +79,7 @@ func (tx *Tx) Update(sqlHead string, args ...interface{}) (Result, error) {
 
 func (tx *Tx) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := tx.Tx.ExecContext(ctx, query, args...)
-	return newResult(result, query, args), err
+	return newResult(result, query, args, false), err
 }
 
 func (tx *Tx) Delete(query string, args ...interface{}) (Result, error) {
