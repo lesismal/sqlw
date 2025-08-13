@@ -16,7 +16,7 @@ type Tx struct {
 
 func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := tx.Tx.ExecContext(ctx, query, args...)
-	return newResult(result, query, args, false), err
+	return newResult(tx.DB, result, query, args, false), err
 }
 
 func (tx *Tx) Exec(query string, args ...interface{}) (Result, error) {
@@ -24,7 +24,7 @@ func (tx *Tx) Exec(query string, args ...interface{}) (Result, error) {
 }
 
 func (tx *Tx) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
-	return queryRowContext(ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
+	return queryRowContext(tx.DB, ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
 }
 
 func (tx *Tx) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -32,7 +32,7 @@ func (tx *Tx) QueryRow(dst interface{}, query string, args ...interface{}) (Resu
 }
 
 func (tx *Tx) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
-	return queryContext(ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
+	return queryContext(tx.DB, ctx, tx.Tx, tx.parseFieldName, dst, tx.mapping, tx.rawScan, query, args...)
 }
 
 func (tx *Tx) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -79,7 +79,7 @@ func (tx *Tx) Update(sqlHead string, args ...interface{}) (Result, error) {
 
 func (tx *Tx) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := tx.Tx.ExecContext(ctx, query, args...)
-	return newResult(result, query, args, false), err
+	return newResult(tx.DB, result, query, args, false), err
 }
 
 func (tx *Tx) Delete(query string, args ...interface{}) (Result, error) {

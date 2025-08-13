@@ -23,7 +23,7 @@ func (stmt *Stmt) Sql(ctx context.Context, dst interface{}, args ...interface{})
 
 func (stmt *Stmt) ExecContext(ctx context.Context, args ...interface{}) (Result, error) {
 	result, err := stmt.Stmt.ExecContext(ctx, args...)
-	return newResult(result, stmt.query, args, false), err
+	return newResult(stmt.DB, result, stmt.query, args, false), err
 }
 
 func (stmt *Stmt) Exec(args ...interface{}) (Result, error) {
@@ -42,7 +42,7 @@ func (stmt *Stmt) QueryRowContext(ctx context.Context, dst interface{}, args ...
 	defer rows.Close()
 
 	notFound, err := rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-	return newResult(nil, stmt.query, args, notFound), err
+	return newResult(stmt.DB, nil, stmt.query, args, notFound), err
 }
 
 func (stmt *Stmt) QueryRow(dst interface{}, args ...interface{}) (Result, error) {
@@ -59,11 +59,11 @@ func (stmt *Stmt) QueryContext(ctx context.Context, dst interface{}, args ...int
 	notFound := true
 	if isStructPtr(reflect.TypeOf(dst)) {
 		notFound, err = rowsToStruct(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-		return newResult(nil, stmt.query, args, notFound), err
+		return newResult(stmt.DB, nil, stmt.query, args, notFound), err
 	}
 
 	notFound, err = rowsToSlice(rows, dst, stmt.parseFieldName, stmt.mapping, sqlMappingKey(opTypSelect, stmt.query, reflect.TypeOf(dst)), stmt.rawScan)
-	return newResult(nil, stmt.query, args, notFound), err
+	return newResult(stmt.DB, nil, stmt.query, args, notFound), err
 }
 
 func (stmt *Stmt) Query(dst interface{}, args ...interface{}) (Result, error) {
@@ -110,7 +110,7 @@ func (stmt *Stmt) Update(args ...interface{}) (Result, error) {
 
 func (stmt *Stmt) DeleteContext(ctx context.Context, args ...interface{}) (Result, error) {
 	result, err := stmt.Stmt.ExecContext(ctx, args...)
-	return newResult(result, stmt.query, args, false), err
+	return newResult(stmt.DB, result, stmt.query, args, false), err
 }
 
 func (stmt *Stmt) Delete(args ...interface{}) (Result, error) {

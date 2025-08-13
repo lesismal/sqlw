@@ -35,7 +35,7 @@ func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
 	return fmt.Sprintf("%v%v%v", opTyp, query, typ.String())
 }
 
-func queryRowContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
+func queryRowContext(db *DB, ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
 	if dst == nil {
 		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
 	}
@@ -47,10 +47,10 @@ func queryRowContext(ctx context.Context, selector Selector, parser FieldParser,
 	defer rows.Close()
 
 	notFound, err := rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
-	return newResult(nil, query, args, notFound), err
+	return newResult(db, nil, query, args, notFound), err
 }
 
-func queryContext(ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
+func queryContext(db *DB, ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
 	notFound := false
 	typ := reflect.TypeOf(dst)
 	if isStructPtr(typ) {
@@ -60,7 +60,7 @@ func queryContext(ctx context.Context, selector Selector, parser FieldParser, ds
 		}
 		defer rows.Close()
 		notFound, err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
-		return newResult(nil, query, args, notFound), err
+		return newResult(db, nil, query, args, notFound), err
 	}
 
 	if isStructSlicePtr(typ) {
@@ -70,7 +70,7 @@ func queryContext(ctx context.Context, selector Selector, parser FieldParser, ds
 		}
 		defer rows.Close()
 		notFound, err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
-		return newResult(nil, query, args, notFound), err
+		return newResult(db, nil, query, args, notFound), err
 	}
 
 	dstValue := reflect.Indirect(reflect.ValueOf(dst))
@@ -78,7 +78,7 @@ func queryContext(ctx context.Context, selector Selector, parser FieldParser, ds
 	if err == sql.ErrNoRows {
 		notFound = true
 	}
-	return newResult(nil, query, args, notFound), err
+	return newResult(db, nil, query, args, notFound), err
 }
 
 func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *sync.Map, key string, rawScan bool) (bool, error) {
@@ -421,11 +421,11 @@ func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead s
 			}
 
 			result, err := selector.ExecContext(ctx, sqlHead+sqlTail, args...)
-			return newResult(result, sqlHead, args, false), err
+			return newResult(db, result, sqlHead, args, false), err
 		}
 
 		result, err := stmt.ExecContext(ctx, args...)
-		return newResult(result, stmt.query, args, false), err
+		return newResult(db, result, stmt.query, args, false), err
 	}
 
 	var err error
@@ -495,7 +495,7 @@ INIT_FIELD_VALUES:
 
 		query := info.SqlHead + sqlTail
 		result, err := selector.ExecContext(ctx, query, fieldValues...)
-		return newResult(result, query, fieldValues, false), err
+		return newResult(db, result, query, fieldValues, false), err
 	}
 
 	for _, item := range insertItems {
@@ -507,7 +507,7 @@ INIT_FIELD_VALUES:
 	}
 
 	result, err := stmt.ExecContext(ctx, fieldValues...)
-	return newResult(result, stmt.query, fieldValues, false), err
+	return newResult(db, result, stmt.query, fieldValues, false), err
 }
 
 func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingInfo, error) {
@@ -657,11 +657,11 @@ func updateContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, s
 	if !isStmt {
 		query := info.SqlHead
 		result, err := selector.ExecContext(ctx, query, fieldValues...)
-		return newResult(result, query, fieldValues, false), err
+		return newResult(db, result, query, fieldValues, false), err
 	}
 
 	result, err := stmt.ExecContext(ctx, fieldValues...)
-	return newResult(result, stmt.query, fieldValues, false), err
+	return newResult(db, result, stmt.query, fieldValues, false), err
 }
 
 func updateByExecContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, query string, args ...interface{}) (Result, error) {
@@ -684,11 +684,11 @@ func updateByExecContext(ctx context.Context, selector Selector, db *DB, stmt *S
 	if obj == nil {
 		if selector != nil {
 			result, err := selector.ExecContext(ctx, query, args...)
-			return newResult(result, query, args, false), err
+			return newResult(db, result, query, args, false), err
 		}
 
 		result, err := stmt.ExecContext(ctx, args...)
-		return newResult(result, query, args, false), err
+		return newResult(db, result, query, args, false), err
 	}
 
 	return updateContext(ctx, selector, db, stmt, query, obj, args...)

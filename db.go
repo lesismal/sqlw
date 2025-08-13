@@ -23,9 +23,10 @@ type DB struct {
 	mapping            *sync.Map
 	fieldNameParser    FieldParser
 
-	ctx     context.Context
-	cancel  func()
-	isMysql bool
+	ctx      context.Context
+	cancel   func()
+	isMysql  bool
+	printSql func(string)
 }
 
 func (db *DB) Begin() (*Tx, error) {
@@ -52,7 +53,7 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 
 func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := db.DB.ExecContext(ctx, query, args...)
-	return newResult(result, query, args, false), err
+	return newResult(db, result, query, args, false), err
 }
 
 func (db *DB) Exec(query string, args ...interface{}) (Result, error) {
@@ -72,7 +73,7 @@ func (db *DB) PrepareContext(ctx context.Context, query string) (*Stmt, error) {
 }
 
 func (db *DB) QueryRowContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
-	return queryRowContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
+	return queryRowContext(db, ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
 func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -80,7 +81,7 @@ func (db *DB) QueryRow(dst interface{}, query string, args ...interface{}) (Resu
 }
 
 func (db *DB) QueryContext(ctx context.Context, dst interface{}, query string, args ...interface{}) (Result, error) {
-	return queryContext(ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
+	return queryContext(db, ctx, db.DB, db.parseFieldName, dst, db.mapping, db.rawScan, query, args...)
 }
 
 func (db *DB) Query(dst interface{}, query string, args ...interface{}) (Result, error) {
@@ -127,7 +128,7 @@ func (db *DB) Update(sqlHead string, args ...interface{}) (Result, error) {
 
 func (db *DB) DeleteContext(ctx context.Context, query string, args ...interface{}) (Result, error) {
 	result, err := db.DB.ExecContext(ctx, query, args...)
-	return newResult(result, query, args, false), err
+	return newResult(db, result, query, args, false), err
 }
 
 func (db *DB) Delete(query string, args ...interface{}) (Result, error) {
@@ -247,4 +248,8 @@ func WrapContext(ctx context.Context, db *sql.DB, driverName, tag string) *DB {
 		sqlwDB.ctx, sqlwDB.cancel = context.WithCancel(context.Background())
 	}
 	return sqlwDB
+}
+
+func (db *DB) PrintSql(f func(string)) {
+	db.printSql = f
 }
