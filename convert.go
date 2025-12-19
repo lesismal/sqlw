@@ -37,12 +37,15 @@ func sqlMappingKey(opTyp, query string, typ reflect.Type) string {
 
 func queryRowContext(db *DB, ctx context.Context, selector Selector, parser FieldParser, dst interface{}, mapping *sync.Map, rawScan bool, query string, args ...interface{}) (Result, error) {
 	if dst == nil {
-		return nil, fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
+		return newResult(db, nil, query, args, false), fmt.Errorf("[sqlw %v] invalid dest value nil: %v", opTypSelect, reflect.TypeOf(dst))
 	}
 
 	rows, err := selector.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		if err == sql.ErrNoRows {
+			return newResult(db, nil, query, args, true), nil
+		}
+		return newResult(db, nil, query, args, false), err
 	}
 	defer rows.Close()
 
@@ -56,7 +59,10 @@ func queryContext(db *DB, ctx context.Context, selector Selector, parser FieldPa
 	if isStructPtr(typ) {
 		rows, err := selector.QueryContext(ctx, query, args...)
 		if err != nil {
-			return nil, err
+			if err == sql.ErrNoRows {
+				return newResult(db, nil, query, args, true), nil
+			}
+			return newResult(db, nil, query, args, false), err
 		}
 		defer rows.Close()
 		notFound, err = rowsToStruct(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
@@ -66,7 +72,10 @@ func queryContext(db *DB, ctx context.Context, selector Selector, parser FieldPa
 	if isStructSlicePtr(typ) {
 		rows, err := selector.QueryContext(ctx, query, args...)
 		if err != nil {
-			return nil, err
+			if err == sql.ErrNoRows {
+				return newResult(db, nil, query, args, true), nil
+			}
+			return newResult(db, nil, query, args, false), err
 		}
 		defer rows.Close()
 		notFound, err = rowsToSlice(rows, dst, parser, mapping, sqlMappingKey(opTypSelect, query, reflect.TypeOf(dst)), rawScan)
@@ -76,9 +85,9 @@ func queryContext(db *DB, ctx context.Context, selector Selector, parser FieldPa
 	dstValue := reflect.Indirect(reflect.ValueOf(dst))
 	err := selector.QueryRowContext(ctx, query, args...).Scan(dstValue.Addr().Interface())
 	if err == sql.ErrNoRows {
-		notFound = true
+		return newResult(db, nil, query, args, true), nil
 	}
-	return newResult(db, nil, query, args, notFound), err
+	return newResult(db, nil, query, args, false), err
 }
 
 func rowsToStruct(rows *sql.Rows, dst interface{}, parser FieldParser, mapping *sync.Map, key string, rawScan bool) (bool, error) {
@@ -368,7 +377,7 @@ func getInsertModelInfo(sqlHead, sqlHeadLower string, dataTyp reflect.Type, db *
 func insertContext(ctx context.Context, selector Selector, stmt *Stmt, sqlHead string, db *DB, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
-		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
+		return newResult(db, nil, "", args, false), fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
 	}
 
 	var raw = false
@@ -626,7 +635,7 @@ func getUpdateModelInfo(sqlHead string, dataTyp reflect.Type, db *DB) (*MappingI
 func updateContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, sqlHead string, data interface{}, args ...interface{}) (Result, error) {
 	isStmt := (stmt != nil)
 	if !isStmt && sqlHead == "" {
-		return nil, fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
+		return newResult(db, nil, "", args, false), fmt.Errorf("[sqlw %v] invalid sql head: %v", opTypInsert, sqlHead)
 	}
 
 	var err error
@@ -636,7 +645,7 @@ func updateContext(ctx context.Context, selector Selector, db *DB, stmt *Stmt, s
 
 	info, err := getUpdateModelInfo(sqlHead, dataTyp, db)
 	if err != nil {
-		return nil, err
+		return newResult(db, nil, "", args, false), err
 	}
 
 	if isStructPtr(dataTyp) {
